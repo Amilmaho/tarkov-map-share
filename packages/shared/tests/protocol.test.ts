@@ -31,6 +31,19 @@ const room = {
 
 const member = { userId: USER, roomId: ROOM, role: "owner", joinedAt: NOW, online: true };
 
+const player = {
+  id: USER,
+  displayName: "阿飞",
+  color: "#4c8dff",
+  mapId: "customs",
+  position,
+  rotation: 66.63,
+  source: "screenshot",
+  online: true,
+  lastSeenAt: NOW,
+  positionCapturedAt: NOW - 1500,
+};
+
 const marker = {
   id: MARKER_ID,
   roomId: ROOM,
@@ -93,7 +106,7 @@ const serverMessages = [
     ...envelope,
     from: null,
     type: "room.snapshot",
-    payload: { room, members: [member], markers: [marker], routes: [route], serverTime: NOW },
+    payload: { room, members: [member], players: [player], markers: [marker], routes: [route], serverTime: NOW },
   },
   { ...envelope, from: null, type: "room.member_joined", payload: { member } },
   { ...envelope, from: null, type: "room.member_left", payload: { memberId: USER, reason: "timeout" } },
@@ -130,11 +143,11 @@ describe("客户端消息", () => {
     }
   });
 
-  it("room.create 的 maxMembers 有默认值", () => {
+  it("room.create 允许省略 maxMembers，由服务端决定默认值", () => {
     const result = parseClientMessage(clientMessages[0]);
     expect(result.ok).toBe(true);
     if (!result.ok || result.message.type !== "room.create") return;
-    expect(result.message.payload.maxMembers).toBe(5);
+    expect(result.message.payload.maxMembers).toBeUndefined();
   });
 
   it("marker.create 允许省略 color", () => {

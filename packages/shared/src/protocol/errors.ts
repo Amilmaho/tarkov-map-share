@@ -11,6 +11,7 @@ export const ERROR_CODES = [
   "RATE_LIMITED",
   "FORBIDDEN",
   "ALREADY_IN_ROOM",
+  "NOT_IN_ROOM",
   "INTERNAL",
 ] as const;
 

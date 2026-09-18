@@ -57,3 +57,9 @@ export const LabelSchema = z
 export const PasscodeSchema = z.string().min(4, "口令至少 4 位").max(32, "口令最长 32 位");
 
 export type WorldPosition = z.infer<typeof WorldPositionSchema>;
+export type MapId = z.infer<typeof MapIdSchema>;
+export type RoomCode = z.infer<typeof RoomCodeSchema>;
+export type UserId = z.infer<typeof UserIdSchema>;
+export type MarkerId = z.infer<typeof MarkerIdSchema>;
+export type RouteId = z.infer<typeof RouteIdSchema>;
+export type MessageId = z.infer<typeof MessageIdSchema>;

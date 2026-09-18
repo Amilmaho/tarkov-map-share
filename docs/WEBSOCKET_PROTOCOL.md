@@ -55,7 +55,7 @@
 
 | `type` | payload | 说明 |
 | --- | --- | --- |
-| `room.create` | `{ mapId, displayName, maxMembers? }` | 创建房间，返回房间码 |
+| `room.create` | `{ mapId, displayName, maxMembers?, passcode? }` | 创建房间，返回房间码；口令可选，人数上限不传则由服务端决定 |
 | `room.join` | `{ roomId, displayName, passcode? }` | 加入房间 |
 | `room.leave` | `{}` | 主动离开 |
 | `map.change` | `{ mapId }` | 切换整队地图（需要权限，默认房主） |
@@ -75,7 +75,7 @@
 | --- | --- | --- |
 | `room.created` | `{ room }` | 创建成功，含房间码与自身成员信息 |
 | `room.joined` | `{ room, self }` | 加入成功 |
-| `room.snapshot` | `{ room, members, markers, routes, serverTime }` | 全量状态 |
+| `room.snapshot` | `{ room, members, players, markers, routes, serverTime }` | 全量状态；`players` 只包含至少上报过一次位置的成员 |
 | `room.member_joined` | `{ member }` | 有新成员加入 |
 | `room.member_left` | `{ memberId, reason }` | 成员离开（`leave` / `timeout` / `kicked`） |
 | `map.changed` | `{ mapId, changedBy }` | 全队地图切换 |
@@ -96,7 +96,7 @@
 C → S  room.create { mapId: "customs", displayName: "阿飞" }
 S → C  room.created { room: { id: "R7K2QF", ... }, self: {...} }
 C → S  player.update { position: { x: 120.5, z: -60.25 }, mapId: "customs" }
-S → C  ack { refId: "<msg id>" }
+S → C  （无回应：位置是高频且可丢弃的数据，不回 ack）
 ```
 
 ### 4.2 第二名成员加入
@@ -126,6 +126,10 @@ S  → C2 marker.created { marker }
 6. **快照对齐**：重连后必须重新 `room.join` + 接收 `room.snapshot`，用快照覆盖本地状态。
 7. **未知字段忽略**：校验使用 `.strip()` 语义，多余字段被丢弃而不是报错，以支持协议第 8 节的向前兼容。
 8. **空补丁拒绝**：`marker.update` / `route.update` 的 `patch` 不许为空对象。
+9. **广播范围**：`player.updated`、`marker.*`、`route.*` 只发给**其他**成员（发送方已有乐观状态并会收到 `ack`）；
+   `map.changed` 发给包括发起方在内的所有成员。
+10. **`map.change` 权限**：房间内任意成员都可以切图（互信小队模型，见 ADR-0005）；需要收紧时只改这一处。
+11. **状态与广播同源**：服务端先在内存状态上应用变更，再由同一份数据生成广播内容，保证各成员看到的状态一致。
 
 ## 6. 错误码
 
@@ -139,6 +143,7 @@ S  → C2 marker.created { marker }
 | `RATE_LIMITED` | 429 | 触发频率限制 | 退避后重试，不弹错 |
 | `FORBIDDEN` | 403 | 无权限（如非房主切图） | 提示无权限 |
 | `ALREADY_IN_ROOM` | 409 | 重复加入 | 忽略，等待快照 |
+| `NOT_IN_ROOM` | 409 | 未加入房间就发送了房间内消息 | 回到加入房间界面 |
 | `INTERNAL` | 500 | 服务端异常 | 提示重试并上报日志 |
 
 错误消息示例：

@@ -11,6 +11,7 @@ import {
   MessageIdSchema,
   MemberLeaveReasonSchema,
   PasscodeSchema,
+  PlayerStateSchema,
   PlayerSourceSchema,
   RoomCodeSchema,
   RoomMemberSchema,
@@ -71,7 +72,10 @@ const EmptyPayloadSchema = z.object({});
 export const RoomCreatePayloadSchema = z.object({
   mapId: MapIdSchema,
   displayName: DisplayNameSchema,
-  maxMembers: z.number().int().min(2).max(10).default(5),
+  /** 不传时由服务端使用默认人数上限 */
+  maxMembers: z.number().int().min(2).max(10).optional(),
+  /** 可选口令；设置后加入房间必须提供 */
+  passcode: PasscodeSchema.optional(),
 });
 
 export const RoomJoinPayloadSchema = z.object({
@@ -149,6 +153,8 @@ export const RoomJoinedPayloadSchema = z.object({
 export const RoomSnapshotPayloadSchema = z.object({
   room: RoomSchema,
   members: z.array(RoomMemberSchema).max(10),
+  /** 只包含至少上报过一次位置的成员 */
+  players: z.array(PlayerStateSchema).max(10),
   markers: z.array(MarkerSchema).max(2000),
   routes: z.array(RouteSchema).max(500),
   serverTime: TimestampSchema,
@@ -234,6 +240,61 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[number];
 export type ServerMessageType = (typeof SERVER_MESSAGE_TYPES)[number];
+
+/** 取出联合类型中某个 `type` 对应的消息类型 */
+export type MessageOf<M, T extends string> = Extract<M, { type: T }>;
+
+export type MessageEnvelopeInput = {
+  id: string;
+  ts: number;
+  roomId: string | null;
+};
+
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/** 去掉信封字段后的客户端消息体（保留 type 与 payload 的判别联合关系） */
+export type ClientMessageBody = DistributiveOmit<ClientMessage, "v" | "id" | "ts" | "roomId" | "from">;
+/** 去掉信封字段后的服务端消息体 */
+export type ServerMessageBody = DistributiveOmit<ServerMessage, "v" | "id" | "ts" | "roomId" | "from">;
+
+/**
+ * 构造客户端消息。
+ *
+ * 入参是「消息体 + 信封」而不是一堆泛型参数，这样 TypeScript 可以直接用判别联合
+ * 校验 `payload` 是否与 `type` 匹配，不需要任何类型断言。
+ */
+export function createClientMessage(
+  body: ClientMessageBody,
+  envelope: MessageEnvelopeInput & { from: string | null },
+): ClientMessage {
+  return {
+    v: PROTOCOL_VERSION,
+    id: envelope.id,
+    ts: envelope.ts,
+    roomId: envelope.roomId,
+    from: envelope.from,
+    ...body,
+  } as ClientMessage;
+}
+
+/** 构造服务端消息，`from` 固定为 `"server"` */
+export function createServerMessage(
+  body: ServerMessageBody,
+  envelope: MessageEnvelopeInput,
+): ServerMessage {
+  return {
+    v: PROTOCOL_VERSION,
+    id: envelope.id,
+    ts: envelope.ts,
+    roomId: envelope.roomId,
+    from: "server",
+    ...body,
+  } as ServerMessage;
+}
+
+export function createAckPayload(refId: string): { refId: string; ok: true } {
+  return { refId, ok: true };
+}
 
 /**
  * 解析结果：失败时返回可直接写进日志的原因列表。

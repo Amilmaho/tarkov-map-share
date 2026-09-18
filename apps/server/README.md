@@ -2,23 +2,46 @@
 
 Node.js + TypeScript 服务端，负责房间生命周期、权威状态与实时广播。
 
+**默认拓扑是房主模式**（ADR-0013）：服务端跑在房主的电脑上，队友通过局域网地址连入，
+不需要任何公网服务器；同一份代码也可以原样部署到 VPS。
+
 ## 模块划分
 
 ```text
 apps/server/
 ├── src/
-│   ├── gateway/         # 连接、鉴权、心跳、消息入口与 Zod 校验
-│   ├── rooms/           # 房间注册表、成员、快照、广播
-│   ├── handlers/        # 按消息类型划分的处理函数（纯逻辑）
-│   ├── persistence/     # SQLite 读写与迁移
-│   └── http/            # Fastify：健康检查、地图清单、房间码校验
+│   ├── create-server.ts   # createGameServer()：可嵌入的服务端工厂
+│   ├── index.ts           # CLI 薄壳（读环境变量、打印局域网地址、优雅退出）
+│   ├── config.ts          # 端口、心跳、限流、配色等常量
+│   ├── logger.ts          # 结构化日志（自动脱敏口令）
+│   ├── network.ts         # 枚举可分享的局域网地址
+│   ├── gateway/           # 连接状态、限流、消息入口
+│   ├── handlers/          # 按消息类型划分的处理函数（与传输层解耦）
+│   └── rooms/             # 房间状态与不变量（容量、口令、标记、路线）
 └── tests/               # 房间与协议集成测试
 ```
 
-## 依赖与命令
+## 命令
 
-依赖在 Phase 2 引入（`ws`、Fastify、Zod、better-sqlite3）。当前骨架阶段不提供可运行脚本，
-`npm run dev:server` 会以 `--if-present` 安静跳过。
+```bash
+npm run dev:server                       # 仓库根目录启动，默认 0.0.0.0:8787
+TMS_PORT=9000 npm run dev:server         # 换端口
+TMS_HOST=127.0.0.1 npm run dev:server    # 单机模式，队友连不上
+```
+
+启动后会打印队友应连接的局域网地址，例如 `192.168.31.33:8787`。
+Windows 首次启动会弹出防火墙授权，必须允许专用网络访问。
+
+## 作为库使用（桌面端）
+
+```ts
+import { createGameServer } from "@tarkov-map-share/server";
+
+const server = await createGameServer({ host: "0.0.0.0", port: 8787 });
+console.log(server.url, server.port);
+// 退出时
+await server.close();
+```
 
 ## 关键约束
 
