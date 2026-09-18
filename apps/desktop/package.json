@@ -2,6 +2,7 @@
   "name": "@tarkov-map-share/desktop",
   "version": "0.0.0",
   "private": true,
+  "productName": "tarkov-map-share",
   "description": "Electron + React 桌面客户端（地图渲染 + 截图目录监听）",
   "main": "out/main/index.js",
   "scripts": {
