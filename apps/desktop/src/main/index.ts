@@ -10,7 +10,17 @@ import { createScreenshotWatcher, defaultScreenshotDirectory } from "./screensho
 
 let mainWindow: BrowserWindow | null = null;
 
+/**
+ * 允许用环境变量覆盖截图目录，主要用于两种场景：
+ * 1. 游戏不在本机时做联调测试；
+ * 2. 文档目录被 OneDrive 接管、默认路径不对时临时指定。
+ */
+const screenshotDirectoryOverride = process.env.TMS_SCREENSHOT_DIR;
+
 const watcher = createScreenshotWatcher({
+  ...(screenshotDirectoryOverride === undefined || screenshotDirectoryOverride === ""
+    ? {}
+    : { directory: screenshotDirectoryOverride }),
   onCapture: (capture) => {
     mainWindow?.webContents.send("screenshots:capture", capture);
   },

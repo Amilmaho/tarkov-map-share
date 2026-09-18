@@ -48,6 +48,12 @@ npm run test:e2e --workspace @tarkov-map-share/desktop   # 端到端（需先 bu
 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install
 ```
 
+想在没有游戏的机器上联调时，可以用环境变量指定截图目录：
+
+```bash
+TMS_SCREENSHOT_DIR=/path/to/screenshots npm run dev:desktop
+```
+
 ## 使用流程
 
 1. **标定地图**（每张图一次）：点工具栏"标定" → 在地图上点 4 个认得出的地标 → 每个点填入它的

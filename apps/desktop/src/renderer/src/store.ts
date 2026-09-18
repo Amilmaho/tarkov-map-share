@@ -186,7 +186,9 @@ export const useMapStore = create<MapStore>((set, get) => ({
       ),
     }),
 
-  applyCapture: (capture) =>
+  applyCapture: (capture) => {
+    const { homography } = get();
+    const hasPosition = capture.position.x !== 0 || capture.position.z !== 0;
     set({
       latestCapture: capture,
       self: {
@@ -196,8 +198,13 @@ export const useMapStore = create<MapStore>((set, get) => ({
         fileName: capture.fileName,
         source: "screenshot",
       },
-      notice: null,
-    }),
+      // 未标定时坐标只能显示在侧栏，画不到图上；这里必须说清楚，否则看起来像"没反应"
+      notice:
+        homography === null && hasPosition
+          ? `已读到坐标 (${capture.position.x.toFixed(1)}, ${capture.position.z.toFixed(1)})，但地图还没标定，暂时画不到图上。点"开始标定"约 1 分钟即可完成。`
+          : null,
+    });
+  },
   setSelfManual: (position) =>
     set({
       self: {
