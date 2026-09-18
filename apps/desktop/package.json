@@ -2,5 +2,29 @@
   "name": "@tarkov-map-share/desktop",
   "version": "0.0.0",
   "private": true,
-  "description": "Electron + React 桌面客户端"
+  "description": "Electron + React 桌面客户端（地图渲染 + 截图目录监听）",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.e2e.json"
+  },
+  "dependencies": {
+    "@tarkov-map-share/shared": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "electron-vite": "^2.3.0",
+    "vite": "^5.4.11"
+  }
 }

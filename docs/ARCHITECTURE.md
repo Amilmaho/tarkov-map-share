@@ -47,15 +47,18 @@
 
 ### 3.1 桌面端 `apps/desktop`
 
-* **Main 进程**：窗口与生命周期、托盘、系统通知、本地配置与 Token 的安全存储、自定义协议的素材加载。
-* **Preload**：通过 `contextBridge` 暴露最小化、白名单化的 IPC API；渲染进程不开启 `nodeIntegration`。
-* **Renderer**：React 应用，按功能分层：
-  * `features/map`：地图视图、图层、缩放平移交互。
-  * `features/room`：房间创建/加入、成员列表。
-  * `features/markers`：标记与路线的增删改查。
-  * `features/session`：连接状态、重连、离线队列。
-  * `stores`：Zustand Store，按领域拆分。
-  * `services/ws`：WebSocket 客户端（连接、心跳、重连、消息分发）。
+* **Main 进程**：窗口与生命周期、截图目录扫描、标定文件读写、系统目录选择框。
+  安全基线：`sandbox: true` + `contextIsolation: true` + `nodeIntegration: false`。
+* **Preload**：通过 `contextBridge` 暴露白名单 API（`window.desktopApi`），
+  渲染进程拿不到 `ipcRenderer`，也无法构造任意通道名。
+* **Renderer**：React + Zustand + Canvas 2D：
+  * `components/MapCanvas`：地图绘制、缩放平移、打点与选中交互。
+  * `components/Toolbar` / `Sidebar` / `CalibrationPanel`：模式切换、位置与标记面板、标定流程。
+  * `calibration.ts` / `format.ts`：纯函数（标定求解、文案格式化），可直接单测。
+  * `store.ts`：单一只 Zustand Store，Phase 4 会按领域拆分。
+
+Phase 4 会在此基础上增加 `services/ws`（WebSocket 客户端：连接、心跳、重连、消息分发）
+与房间/成员界面。
 
 ### 3.2 服务端 `apps/server`
 

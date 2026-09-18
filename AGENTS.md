@@ -124,6 +124,9 @@ npm run lint                # 代码风格检查
 8. **只读外部文件**：截图目录、日志目录一律只读，不修改、不删除、不上传文件内容。
 9. **服务端可嵌入**：`apps/server` 的核心是 `createGameServer()` 工厂，桌面端在主进程内直接调用；
    CLI 只是薄壳，业务逻辑不允许写进 CLI 或 Electron 主进程。
+10. **地图素材位置**：转换后的地图放在 `apps/desktop/src/renderer/public/maps/`，
+    原始大图放仓库根的 `image/`（已在 .gitignore 中，不入库）；素材来源与许可必须登记到
+    `docs/MAP_COORDINATES.md` 第 8 节。
 
 ---
 

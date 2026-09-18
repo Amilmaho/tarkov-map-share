@@ -29,6 +29,8 @@ data/
 # 地图素材（大文件按需单独管理）
 assets/maps/**/*.png
 assets/maps/**/*.jpg
+# 原始素材暂存目录：转换后的素材放在 apps/desktop/src/renderer/public/maps/
+image/
 
 # 系统与编辑器
 .DS_Store
