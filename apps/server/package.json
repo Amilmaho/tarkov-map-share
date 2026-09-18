@@ -1,0 +1,7 @@
+{
+  "name": "@tarkov-map-share/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node.js 实时服务端（ws + Fastify）"
+}

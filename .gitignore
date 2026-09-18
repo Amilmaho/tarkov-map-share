@@ -1,0 +1,40 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+out/
+build/
+release/
+*.tsbuildinfo
+
+# 测试与缓存
+coverage/
+.vitest/
+.vite/
+playwright-report/
+test-results/
+
+# 本地环境与密钥
+.env
+.env.*
+!.env.example
+
+# 本地数据
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# 地图素材（大文件按需单独管理）
+assets/maps/**/*.png
+assets/maps/**/*.jpg
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+npm-debug.log*
