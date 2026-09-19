@@ -71,6 +71,8 @@ type Room = {
 type RoomMember = {
   userId: string;
   roomId: string;
+  displayName: string;  // 没有上报位置的成员也要能在成员列表里显示
+  color: string;
   role: "owner" | "member";
   joinedAt: number;
   online: boolean;

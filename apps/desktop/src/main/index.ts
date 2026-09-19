@@ -13,6 +13,7 @@ import {
   saveCalibration,
 } from "./calibration-store";
 import { createScreenshotWatcher, defaultScreenshotDirectory } from "./screenshot-watcher";
+import { ServerHost } from "./server-host";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -22,6 +23,9 @@ let mainWindow: BrowserWindow | null = null;
  * 2. 文档目录被 OneDrive 接管、默认路径不对时临时指定。
  */
 const screenshotDirectoryOverride = process.env.TMS_SCREENSHOT_DIR;
+
+/** 房主模式的服务端：跑在应用自己的进程里 */
+const serverHost = new ServerHost();
 
 const watcher = createScreenshotWatcher({
   ...(screenshotDirectoryOverride === undefined || screenshotDirectoryOverride === ""
@@ -141,6 +145,10 @@ function registerIpcHandlers(): void {
     const mapIds = await importBundle(app.getPath("userData"), filePath);
     return { mapCount: mapIds.length, mapIds };
   });
+
+  ipcMain.handle("host:start", async () => await serverHost.start());
+  ipcMain.handle("host:stop", async () => await serverHost.stop());
+  ipcMain.handle("host:state", () => serverHost.state());
 }
 
 void app.whenReady().then(async () => {
@@ -159,4 +167,5 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   void watcher.close();
+  void serverHost.stop();
 });

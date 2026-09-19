@@ -398,7 +398,8 @@ describe("启动与端口", () => {
     });
     servers.push(second);
 
-    expect(second.port).toBe(first.port + 1);
+    // 正常是从起始端口往后 +1；相邻端口恰好被别的进程占用时会继续往后找
+    expect(second.port).toBeGreaterThan(first.port);
     expect(first.port).not.toBe(second.port);
   });
 

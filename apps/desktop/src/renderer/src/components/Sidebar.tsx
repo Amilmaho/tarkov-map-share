@@ -4,6 +4,7 @@ import { formatFreshness, formatPosition } from "../format";
 import { useNow } from "../hooks/useNow";
 import { MARKER_KIND_COLORS, MARKER_KIND_LABELS, useMapStore } from "../store";
 import { CalibrationPanel } from "./CalibrationPanel";
+import { RoomPanel } from "./RoomPanel";
 
 export function Sidebar() {
   const now = useNow();
@@ -41,6 +42,8 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
+      <RoomPanel />
+
       <section className="panel">
         <header className="panel__head">
           <h2>我的位置</h2>

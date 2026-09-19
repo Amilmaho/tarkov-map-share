@@ -432,6 +432,43 @@ body {
   border-top: 1px solid var(--border);
 }
 
+/* ---------- 房间与成员 ---------- */
+
+.room-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+}
+
+.member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  font-size: 13px;
+}
+
+.member-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-row__coords {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
 /* ---------- 提示条 ---------- */
 
 .toast {

@@ -2,12 +2,19 @@ import { create } from "zustand";
 
 import {
   type Calibration,
+  type ClientState,
+  GameClient,
   type Marker,
   type MarkerKind,
+  type MarkerPatch,
   type Matrix3,
+  type PlayerState,
+  type RoomMember,
   type ScreenshotCapture,
+  type ServerMessage,
   type Viewport,
   type WorldPosition,
+  browserSocketFactory,
   createUlid,
   fitToViewport,
   zoomAtPoint as zoomViewportAt,
@@ -30,6 +37,25 @@ export type InteractionMode = "view" | "marker" | "self" | "calibrate" | "shift"
 
 /** 标定来源：随应用分发的共享包 / 元数据预置（未核对）/ 用户自己标的 / 没有 */
 export type CalibrationSource = "none" | "preset" | "shared" | "user";
+
+export type ConnectionRole = "idle" | "host" | "guest";
+
+export type ConnectionInfo = {
+  status: ClientState;
+  role: ConnectionRole;
+  /** 当前连接的 WebSocket 地址 */
+  address: string | null;
+  /** 房主模式下的监听端口与可分享地址 */
+  hostPort: number | null;
+  hostAddresses: string[];
+  error: string | null;
+};
+
+export type RoomInfo = {
+  id: string;
+  mapId: string;
+  maxMembers: number;
+};
 
 export type SelfPosition = {
   position: WorldPosition;
@@ -73,6 +99,34 @@ type MapStore = {
   calibrationSource: CalibrationSource;
   /** 随应用分发的共享标定包，只在本机没有该图标定时使用 */
   sharedCalibrations: Record<string, Calibration>;
+
+  // ---- 联机状态 ----
+  connection: ConnectionInfo;
+  room: RoomInfo | null;
+  /** 房间成员（含没有上报位置的），键是 userId */
+  members: Record<string, RoomMember>;
+  /** 队友的实时位置，键是 userId */
+  players: Record<string, PlayerState>;
+  me: { userId: string | null; displayName: string; color: string | null };
+
+  setDisplayName: (displayName: string) => void;
+  startHosting: () => Promise<void>;
+  joinRoom: (input: { address: string; roomId: string; displayName: string; passcode?: string }) => Promise<void>;
+  leaveRoom: () => void;
+  applyRoomJoined: (room: RoomInfo, userId: string) => void;
+  applySnapshot: (payload: {
+    room: RoomInfo;
+    members: RoomMember[];
+    players: PlayerState[];
+    markers: Marker[];
+  }) => void;
+  applyRemotePlayer: (player: PlayerState) => void;
+  addRemoteMarker: (marker: Marker) => void;
+  patchRemoteMarker: (markerId: string, patch: MarkerPatch) => void;
+  upsertMember: (member: RoomMember) => void;
+  removeMember: (userId: string) => void;
+  setConnectionError: (error: string | null) => void;
+  applyRemoteMapChange: (mapId: string) => void;
   homography: Matrix3 | null;
   calibrationRms: number | null;
   calibrationNote: string | null;
@@ -136,6 +190,162 @@ export const useMapStore = create<MapStore>((set, get) => ({
   calibration: null,
   calibrationSource: "none",
   sharedCalibrations: {},
+  connection: {
+    status: "idle",
+    role: "idle",
+    address: null,
+    hostPort: null,
+    hostAddresses: [],
+    error: null,
+  },
+  room: null,
+  members: {},
+  players: {},
+  me: { userId: null, displayName: "", color: null },
+
+  setDisplayName: (displayName) => set({ me: { ...get().me, displayName } }),
+
+  startHosting: async () => {
+    const api = window.desktopApi;
+    if (api === undefined) {
+      set({ connection: { ...get().connection, error: "当前不在桌面端环境中，无法创建房间" } });
+      return;
+    }
+
+    const displayName = get().me.displayName.trim();
+    if (displayName === "") {
+      set({ connection: { ...get().connection, error: "请先填一个昵称" } });
+      return;
+    }
+
+    const host = await api.host.start();
+    if (!host.running || host.port === null) {
+      set({ connection: { ...get().connection, error: host.error ?? "服务端启动失败" } });
+      return;
+    }
+
+    const address = `ws://127.0.0.1:${host.port}`;
+    set({
+      connection: {
+        ...get().connection,
+        role: "host",
+        address,
+        hostPort: host.port,
+        hostAddresses: host.addresses,
+        error: null,
+      },
+    });
+
+    const client = ensureClient();
+    client.connect(address);
+    client.createRoom({ mapId: get().mapId, displayName });
+  },
+
+  joinRoom: async (input) => {
+    const displayName = input.displayName.trim();
+    if (displayName === "") {
+      set({ connection: { ...get().connection, error: "请先填一个昵称" } });
+      return;
+    }
+
+    const address = normalizeAddress(input.address);
+    set({
+      connection: { ...get().connection, role: "guest", address, error: null },
+    });
+
+    const client = ensureClient();
+    client.connect(address);
+    // 未连接时消息会排队，连上后自动补发
+    client.joinRoom({
+      roomId: input.roomId.trim().toUpperCase(),
+      displayName,
+      ...(input.passcode === undefined || input.passcode === "" ? {} : { passcode: input.passcode }),
+    });
+  },
+
+  leaveRoom: () => {
+    activeClient?.leaveRoom();
+    activeClient?.disconnect();
+    activeClient = null;
+    set({
+      room: null,
+      members: {},
+      players: {},
+      connection: {
+        status: "idle",
+        role: "idle",
+        address: null,
+        hostPort: null,
+        hostAddresses: [],
+        error: null,
+      },
+    });
+    void window.desktopApi?.host.stop();
+  },
+
+  applyRoomJoined: (room, userId) => {
+    set({
+      room,
+      me: { ...get().me, userId },
+      connection: { ...get().connection, error: null },
+    });
+  },
+
+  applySnapshot: ({ room, members, players, markers }) => {
+    set({
+      room,
+      members: Object.fromEntries(members.map((member) => [member.userId, member])),
+      players: Object.fromEntries(players.map((player) => [player.id, player])),
+      // 快照是全量状态：本地标记全部以服务端为准（还没联网时不会走到这里）
+      markers: markers.filter((marker) => marker.deletedAt === null),
+    });
+  },
+
+  applyRemotePlayer: (player) =>
+    set({ players: { ...get().players, [player.id]: { ...get().players[player.id], ...player } } }),
+
+  addRemoteMarker: (marker) => {
+    if (get().markers.some((existing) => existing.id === marker.id)) return;
+    set({ markers: [...get().markers, marker] });
+  },
+
+  patchRemoteMarker: (markerId, patch) => {
+    set({
+      markers: get().markers.map((marker) => {
+        if (marker.id !== markerId) return marker;
+        const next: Marker = { ...marker, updatedAt: Date.now() };
+        if (patch.kind !== undefined) next.kind = patch.kind;
+        if (patch.position !== undefined) next.position = patch.position;
+        if (patch.label !== undefined) next.label = patch.label;
+        if (patch.color !== undefined) next.color = patch.color;
+        return next;
+      }),
+    });
+  },
+
+  upsertMember: (member) => set({ members: { ...get().members, [member.userId]: member } }),
+
+  removeMember: (userId) => {
+    const players = { ...get().players };
+    delete players[userId];
+    const members = { ...get().members };
+    delete members[userId];
+    set({ players, members });
+  },
+
+  setConnectionError: (error) => set({ connection: { ...get().connection, error } }),
+
+  applyRemoteMapChange: (mapId) => {
+    if (findMapOrNull(mapId) === null || get().mapId === mapId) return;
+    set({
+      mapId,
+      // 截图文件名里没有地图信息，换图后旧的位置不再可信
+      self: null,
+      fitted: false,
+      notice: "队友切换了地图，已跟随切换",
+    });
+    void get().loadCalibration();
+  },
   homography: null,
   calibrationRms: null,
   calibrationNote: null,
@@ -199,34 +409,55 @@ export const useMapStore = create<MapStore>((set, get) => ({
     const sameKind = get().markers.filter((marker) => marker.kind === kind).length + 1;
     const marker: Marker = {
       id: `mk_${createUlid(now)}`,
-      roomId: "LOCAL1",
+      roomId: get().room?.id ?? "LOCAL1",
       mapId: get().mapId,
       kind,
       position,
       label: `${MARKER_KIND_LABELS[kind]} ${sameKind}`,
       color: MARKER_KIND_COLORS[kind],
-      createdBy: "usr_LOCAL00000000000000000000",
+      createdBy: get().me.userId ?? "usr_LOCAL00000000000000000000",
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
     };
 
     set({ markers: [...get().markers, marker], selectedMarkerId: marker.id, notice: null });
+
+    // 联机时同步给队友：服务端会用这份数据作为权威状态再广播
+    if (activeClient !== null && get().room !== null) {
+      activeClient.send("marker.create", {
+        marker: {
+          id: marker.id,
+          mapId: marker.mapId,
+          kind: marker.kind,
+          position: marker.position,
+          label: marker.label,
+        },
+      });
+    }
     return true;
   },
-  removeMarker: (markerId) =>
+  removeMarker: (markerId) => {
+    if (activeClient !== null && get().room !== null) {
+      activeClient.send("marker.delete", { markerId });
+    }
     set({
       markers: get().markers.filter((marker) => marker.id !== markerId),
       selectedMarkerId: get().selectedMarkerId === markerId ? null : get().selectedMarkerId,
-    }),
+    });
+  },
   clearMarkers: () => set({ markers: [], selectedMarkerId: null }),
   selectMarker: (selectedMarkerId) => set({ selectedMarkerId }),
-  renameMarker: (markerId, label) =>
+  renameMarker: (markerId, label) => {
+    if (activeClient !== null && get().room !== null) {
+      activeClient.send("marker.update", { markerId, patch: { label } });
+    }
     set({
       markers: get().markers.map((marker) =>
         marker.id === markerId ? { ...marker, label, updatedAt: Date.now() } : marker,
       ),
-    }),
+    });
+  },
 
   applyCapture: (capture) => {
     const { homography } = get();
@@ -246,6 +477,17 @@ export const useMapStore = create<MapStore>((set, get) => ({
           ? `已读到坐标 (${capture.position.x.toFixed(1)}, ${capture.position.z.toFixed(1)})，但地图还没标定，暂时画不到图上。点"开始标定"约 1 分钟即可完成。`
           : null,
     });
+
+    // 联机时把位置同步给队友
+    if (activeClient !== null && get().room !== null && hasPosition) {
+      activeClient.send("player.update", {
+        position: capture.position,
+        rotation: capture.headingDegrees,
+        mapId: get().mapId,
+        source: "screenshot",
+        capturedAt: Date.now(),
+      });
+    }
   },
   setSelfManual: (position) =>
     set({
@@ -467,3 +709,113 @@ export const useMapStore = create<MapStore>((set, get) => ({
     get().setCalibration(null);
   },
 }));
+
+/* ------------------------------------------------------------------ *
+ * 联机：GameClient 接线
+ * ------------------------------------------------------------------ */
+
+/** 当前活动的连接；未联机时为 null */
+let activeClient: GameClient | null = null;
+
+/** 允许用户只填 `192.168.1.23:8787`，自动补上协议前缀 */
+export function normalizeAddress(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === "") return "ws://127.0.0.1:8787";
+  if (/^wss?:\/\//i.test(trimmed)) return trimmed;
+  return `ws://${trimmed}`;
+}
+
+function ensureClient(): GameClient {
+  if (activeClient !== null) return activeClient;
+
+  activeClient = new GameClient({
+    createSocket: browserSocketFactory,
+    onMessage: handleServerMessage,
+    onStateChange: (status) => {
+      useMapStore.setState({ connection: { ...useMapStore.getState().connection, status } });
+    },
+    onError: (reason) => useMapStore.getState().setConnectionError(reason),
+  });
+
+  return activeClient;
+}
+
+function handleServerMessage(message: ServerMessage): void {
+  const store = useMapStore.getState();
+
+  switch (message.type) {
+    case "room.created":
+    case "room.joined": {
+      const room = message.payload.room;
+      const self = message.payload.self;
+      store.applyRoomJoined({ id: room.id, mapId: room.mapId, maxMembers: room.maxMembers }, self.userId);
+      store.setDisplayName(self.displayName);
+      store.upsertMember(self);
+      // 房间当前的地图以服务端为准
+      if (store.mapId !== room.mapId) store.applyRemoteMapChange(room.mapId);
+      break;
+    }
+
+    case "room.snapshot": {
+      const payload = message.payload;
+      store.applySnapshot({
+        room: { id: payload.room.id, mapId: payload.room.mapId, maxMembers: payload.room.maxMembers },
+        members: payload.members,
+        players: payload.players,
+        markers: payload.markers,
+      });
+      break;
+    }
+
+    case "room.member_joined":
+      store.upsertMember(message.payload.member);
+      break;
+
+    case "room.member_left":
+      store.removeMember(message.payload.memberId);
+      break;
+
+    case "player.updated": {
+      const payload = message.payload;
+      const known = store.players[payload.memberId];
+      const member = store.members[payload.memberId];
+      store.applyRemotePlayer({
+        id: payload.memberId,
+        displayName: known?.displayName ?? member?.displayName ?? "队友",
+        color: known?.color ?? member?.color ?? "#4c8dff",
+        mapId: payload.mapId,
+        position: payload.position,
+        rotation: payload.rotation,
+        source: payload.source,
+        online: true,
+        lastSeenAt: message.ts,
+        positionCapturedAt: payload.capturedAt,
+      });
+      break;
+    }
+
+    case "marker.created":
+      store.addRemoteMarker(message.payload.marker);
+      break;
+
+    case "marker.updated":
+      store.patchRemoteMarker(message.payload.markerId, message.payload.patch);
+      break;
+
+    case "marker.deleted":
+      store.removeMarker(message.payload.markerId);
+      break;
+
+    case "map.changed":
+      store.applyRemoteMapChange(message.payload.mapId);
+      break;
+
+    case "error":
+      store.setConnectionError(`${message.payload.message}（${message.payload.code}）`);
+      break;
+
+    default:
+      // ack / pong / room.created 之外的广播不需要额外处理
+      break;
+  }
+}

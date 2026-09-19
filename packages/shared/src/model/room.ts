@@ -32,6 +32,9 @@ export const RoomSchema = z.object({
 export const RoomMemberSchema = z.object({
   userId: UserIdSchema,
   roomId: RoomCodeSchema,
+  /** 昵称与配色：没有上报位置的成员也要能在成员列表里显示 */
+  displayName: DisplayNameSchema,
+  color: ColorSchema,
   role: MemberRoleSchema,
   joinedAt: TimestampSchema,
   online: z.boolean(),

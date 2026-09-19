@@ -480,6 +480,8 @@ export function toProtocolMember(roomId: string, member: MemberState): RoomMembe
   return {
     userId: member.userId,
     roomId,
+    displayName: member.displayName,
+    color: member.color,
     role: member.role,
     joinedAt: member.joinedAt,
     online: member.online,

@@ -35,6 +35,11 @@ const api: DesktopApi = {
     exportBundle: () => ipcRenderer.invoke("calibration:export"),
     importBundle: () => ipcRenderer.invoke("calibration:import"),
   },
+  host: {
+    start: () => ipcRenderer.invoke("host:start"),
+    stop: () => ipcRenderer.invoke("host:stop"),
+    state: () => ipcRenderer.invoke("host:state"),
+  },
 };
 
 contextBridge.exposeInMainWorld("desktopApi", api);

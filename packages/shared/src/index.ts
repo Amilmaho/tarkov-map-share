@@ -9,6 +9,7 @@
  * - `utils/`    ID 生成等无副作用工具
  */
 export * from "./capture/screenshot-filename";
+export * from "./client";
 export * from "./map";
 export * from "./model";
 export * from "./protocol";

@@ -14,14 +14,15 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite";
  * 必须打包进产物，所以要从外部化列表里排除。
  */
 
-const SHARED_PACKAGE = "@tarkov-map-share/shared";
+/** 这两个是纯 TS 源码包，必须打包进产物；其余依赖保持外部引用 */
+const WORKSPACE_PACKAGES = ["@tarkov-map-share/shared", "@tarkov-map-share/server"];
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: [SHARED_PACKAGE] })],
+    plugins: [externalizeDepsPlugin({ exclude: WORKSPACE_PACKAGES })],
   },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: [SHARED_PACKAGE] })],
+    plugins: [externalizeDepsPlugin({ exclude: WORKSPACE_PACKAGES })],
   },
   renderer: {
     plugins: [react()],

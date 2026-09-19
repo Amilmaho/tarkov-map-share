@@ -29,7 +29,15 @@ const room = {
   updatedAt: NOW,
 };
 
-const member = { userId: USER, roomId: ROOM, role: "owner", joinedAt: NOW, online: true };
+const member = {
+  userId: USER,
+  roomId: ROOM,
+  displayName: "阿飞",
+  color: "#4c8dff",
+  role: "owner",
+  joinedAt: NOW,
+  online: true,
+};
 
 const player = {
   id: USER,

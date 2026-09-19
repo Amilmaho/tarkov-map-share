@@ -7,6 +7,14 @@
 
 import type { Calibration, ScreenshotCapture } from "@tarkov-map-share/shared";
 
+export type HostState = {
+  running: boolean;
+  port: number | null;
+  /** 本机可供队友连接的局域网地址 */
+  addresses: string[];
+  error: string | null;
+};
+
 export type AppInfo = {
   version: string;
   /** process.platform 的值，例如 `darwin` / `win32`（用 string 以免渲染进程依赖 Node 类型） */
@@ -60,5 +68,11 @@ export type DesktopApi = {
     /** 导出成一个文件，发给别人导入 */
     exportBundle: () => Promise<CalibrationBundleExport | null>;
     importBundle: () => Promise<CalibrationBundleImport | null>;
+  };
+  /** 房主模式：在应用进程内启动服务端 */
+  host: {
+    start: () => Promise<HostState>;
+    stop: () => Promise<HostState>;
+    state: () => Promise<HostState>;
   };
 };
