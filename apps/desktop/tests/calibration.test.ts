@@ -24,7 +24,38 @@ const corners = [
 ];
 
 describe("buildCalibration", () => {
-  it("少于 4 个控制点时拒绝", () => {
+  it("只有 1 个控制点时拒绝", () => {
+    const result = buildCalibration({
+      mapId: "customs",
+      image,
+      source,
+      points: corners.slice(0, 1).map((point) => ({ image: toPixel(point.x, point.z), world: point })),
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toContain("至少需要 2 个控制点");
+  });
+
+  it("2 个控制点解出相似变换，误差接近零", () => {
+    const [first, third] = corners;
+    if (first === undefined || third === undefined) throw new Error("测试数据缺失");
+
+    const result = buildCalibration({
+      mapId: "customs",
+      image,
+      source,
+      // 两个相距很远的角点
+      points: [first, third].map((point) => ({ image: toPixel(point.x, point.z), world: point })),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.model).toBe("similarity");
+    expect(result.rmsError).toBeLessThan(0.01);
+  });
+
+  it("3 个控制点解出仿射变换", () => {
     const result = buildCalibration({
       mapId: "customs",
       image,
@@ -32,9 +63,9 @@ describe("buildCalibration", () => {
       points: corners.slice(0, 3).map((point) => ({ image: toPixel(point.x, point.z), world: point })),
     });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.reason).toContain("至少需要 4 个控制点");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.model).toBe("affine");
   });
 
   it("只统计填了世界坐标的点", () => {

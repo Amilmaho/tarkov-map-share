@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { parseScreenshotFilename } from "../src/capture/screenshot-filename";
-import { buildHomographyFromCalibration } from "../src/map/calibration";
+import { buildTransformFromCalibration } from "../src/map/calibration";
 import {
   type Matrix3,
   imageToWorld,
   invertMatrix3,
   multiplyMatrix3,
   reprojectionError,
+  solveAffine,
   solveHomography,
+  solveMapping,
+  solveSimilarity,
   worldToImage,
 } from "../src/map/homography";
 import {
@@ -138,6 +141,58 @@ describe("solveHomography", () => {
   });
 });
 
+describe("少量控制点的模型选择", () => {
+  const first = { x: -320, z: 240 };
+  const second = { x: 280, z: 200 };
+  const third = { x: 250, z: -230 };
+
+  it("2 个控制点用相似变换，重投影误差接近 0", () => {
+    const controlPoints = makeControlPoints(TRUE_HOMOGRAPHY, [first, third]);
+    const { model, matrix } = solveMapping(controlPoints);
+
+    expect(model).toBe("similarity");
+    expect(reprojectionError(matrix, controlPoints)).toBeLessThan(0.01);
+  });
+
+  it("3 个控制点用仿射变换", () => {
+    const controlPoints = makeControlPoints(TRUE_HOMOGRAPHY, [first, second, third]);
+    const { model, matrix } = solveMapping(controlPoints);
+
+    expect(model).toBe("affine");
+    expect(reprojectionError(matrix, controlPoints)).toBeLessThan(0.01);
+  });
+
+  it("4 个控制点用单应变换", () => {
+    expect(solveMapping(makeControlPoints(TRUE_HOMOGRAPHY, WORLD_POINTS)).model).toBe("homography");
+  });
+
+  it("少于 2 个控制点时报错", () => {
+    expect(() => solveMapping(makeControlPoints(TRUE_HOMOGRAPHY, [first]))).toThrow(/至少需要 2 个控制点/);
+  });
+
+  it("相似变换保持两轴等比", () => {
+    const matrix = solveSimilarity(makeControlPoints(TRUE_HOMOGRAPHY, [first, third]));
+    const scaleX = Math.hypot(matrix[0], matrix[3]);
+    const scaleY = Math.hypot(matrix[1], matrix[4]);
+
+    expect(scaleX).toBeCloseTo(scaleY, 6);
+  });
+
+  it("仿射变换能吸收两轴比例不同", () => {
+    const stretched = [
+      { world: { x: 0, z: 0 }, image: { px: 0, py: 0 } },
+      { world: { x: 100, z: 0 }, image: { px: 300, py: 0 } },
+      { world: { x: 0, z: 100 }, image: { px: 0, py: 150 } },
+    ];
+    const matrix = solveAffine(stretched);
+    const projected = worldToImage(matrix, { x: 100, z: 100 });
+
+    expect(reprojectionError(matrix, stretched)).toBeLessThan(0.01);
+    expect(projected.px).toBeCloseTo(300, 6);
+    expect(projected.py).toBeCloseTo(150, 6);
+  });
+});
+
 describe("viewport", () => {
   it("屏幕坐标与图像坐标互为逆变换", () => {
     const viewport = createViewport({ scale: 1.7, offsetX: -320, offsetY: 96 });
@@ -218,7 +273,7 @@ describe("截图位置落到地图上", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
 
-    const { homography } = buildHomographyFromCalibration(calibration);
+    const { homography } = buildTransformFromCalibration(calibration);
     const image = worldToImage(homography, parsed.capture.position);
     const expected = toPixel(parsed.capture.position.x, parsed.capture.position.z);
 
@@ -231,10 +286,10 @@ describe("截图位置落到地图上", () => {
   });
 });
 
-describe("buildHomographyFromCalibration", () => {
+describe("buildTransformFromCalibration", () => {
   it("合法校准数据无警告", () => {
     const controlPoints = makeControlPoints(TRUE_HOMOGRAPHY, WORLD_POINTS);
-    const build = buildHomographyFromCalibration({
+    const build = buildTransformFromCalibration({
       mapId: "customs",
       image: { src: "assets/maps/customs.png", width: 2048, height: 2048 },
       rotation: 0,
@@ -256,7 +311,7 @@ describe("buildHomographyFromCalibration", () => {
       image: { px: controlPoints[4]!.image.px + 60, py: controlPoints[4]!.image.py - 45 },
     };
 
-    const build = buildHomographyFromCalibration({
+    const build = buildTransformFromCalibration({
       mapId: "customs",
       image: { src: "assets/maps/customs.png", width: 2048, height: 2048 },
       rotation: 0,
@@ -269,7 +324,7 @@ describe("buildHomographyFromCalibration", () => {
   });
 
   it("声明了 rotation 时提醒确认是否重复体现旋转", () => {
-    const build = buildHomographyFromCalibration({
+    const build = buildTransformFromCalibration({
       mapId: "customs",
       image: { src: "assets/maps/customs.png", width: 2048, height: 2048 },
       rotation: 90,
@@ -280,12 +335,12 @@ describe("buildHomographyFromCalibration", () => {
     expect(build.warnings.some((warning) => warning.includes("rotation"))).toBe(true);
   });
 
-  it("控制点少于 4 个时校验失败", () => {
+  it("控制点少于 2 个时校验失败", () => {
     expect(() =>
-      buildHomographyFromCalibration({
+      buildTransformFromCalibration({
         mapId: "customs",
         image: { src: "assets/maps/customs.png", width: 2048, height: 2048 },
-        controlPoints: makeControlPoints(TRUE_HOMOGRAPHY, WORLD_POINTS.slice(0, 3)),
+        controlPoints: makeControlPoints(TRUE_HOMOGRAPHY, WORLD_POINTS.slice(0, 1)),
         source: { name: "合成校准", license: "内部测试数据" },
       }),
     ).toThrow();

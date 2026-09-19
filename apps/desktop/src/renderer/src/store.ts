@@ -16,6 +16,7 @@ import {
 import type { AppInfo, ScreenshotWatcherStatus } from "../../shared/ipc";
 import {
   type CalibrationDraftPoint,
+  MODEL_LABELS,
   buildCalibration,
   calibrationQuality,
   presetCalibration,
@@ -276,13 +277,14 @@ export const useMapStore = create<MapStore>((set, get) => ({
 
     const quality = calibrationQuality(built.rmsError);
     const prefix = source === "preset" ? "预置标定（未核对） · " : "";
+    const model = MODEL_LABELS[built.model];
     set({
       calibration,
       calibrationSource: source,
       homography: built.homography,
       calibrationRms: built.rmsError,
       calibrationNote:
-        `${prefix}重投影误差 ${built.rmsError.toFixed(2)} 像素（${quality.label}）` +
+        `${prefix}${model} · 重投影误差 ${built.rmsError.toFixed(2)} 像素（${quality.label}）` +
         (built.warnings.length > 0 ? `；${built.warnings.join("；")}` : ""),
       draftPoints: calibration.controlPoints.map((point) => ({ image: point.image, world: point.world })),
     });
@@ -327,20 +329,21 @@ export const useMapStore = create<MapStore>((set, get) => ({
     if (!built.ok) return { ok: false, message: built.reason };
 
     const quality = calibrationQuality(built.rmsError);
+    const model = MODEL_LABELS[built.model];
     set({
       calibration: built.calibration,
       calibrationSource: "user",
       homography: built.homography,
       calibrationRms: built.rmsError,
       calibrationNote:
-        `重投影误差 ${built.rmsError.toFixed(2)} 像素（${quality.label}）` +
+        `${model} · 重投影误差 ${built.rmsError.toFixed(2)} 像素（${quality.label}）` +
         (built.warnings.length > 0 ? `；${built.warnings.join("；")}` : ""),
       mode: "view",
     });
     return {
       ok: true,
       message:
-        `标定完成：重投影误差 ${built.rmsError.toFixed(2)} 像素` +
+        `标定完成（${model}）：重投影误差 ${built.rmsError.toFixed(2)} 像素` +
         (built.warnings.length > 0 ? `；注意：${built.warnings[0]}` : ""),
     };
   },

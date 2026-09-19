@@ -6,13 +6,15 @@
  */
 
 import { type Calibration, CalibrationSchema } from "../model/map";
-import { type Matrix3, reprojectionError, solveHomography } from "./homography";
+import { type MappingModel, type Matrix3, reprojectionError, solveMapping } from "./homography";
 
 /** 重投影误差超过该值（像素）时给出警告 */
 export const REPROJECTION_WARN_PIXELS = 3;
 
 export type CalibrationBuild = {
   homography: Matrix3;
+  /** 实际使用的模型：控制点 2 个 → 相似变换，3 个 → 仿射，4 个以上 → 单应 */
+  model: MappingModel;
   /** 控制点重投影误差，单位像素（均方根） */
   rmsError: number;
   warnings: string[];
@@ -23,9 +25,9 @@ export type CalibrationBuild = {
  *
  * @throws 数据不符合 Schema、控制点退化时抛错
  */
-export function buildHomographyFromCalibration(input: unknown): CalibrationBuild {
+export function buildTransformFromCalibration(input: unknown): CalibrationBuild {
   const calibration: Calibration = CalibrationSchema.parse(input);
-  const homography = solveHomography(calibration.controlPoints);
+  const { model, matrix: homography } = solveMapping(calibration.controlPoints);
   const rmsError = reprojectionError(homography, calibration.controlPoints);
 
   const warnings: string[] = [];
@@ -38,5 +40,5 @@ export function buildHomographyFromCalibration(input: unknown): CalibrationBuild
     warnings.push("校准数据声明了 rotation，请确认控制点中未重复体现同一旋转");
   }
 
-  return { homography, rmsError, warnings };
+  return { homography, model, rmsError, warnings };
 }

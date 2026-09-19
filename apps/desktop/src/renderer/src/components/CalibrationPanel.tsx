@@ -132,6 +132,9 @@ export function CalibrationPanel() {
           <p className="panel__hint">
             步骤：在图上点一下地标 → 填它的世界坐标（X 与 Z）。至少 4 个点，分布越开越准。
             <br />
+            <strong>点 2 个就能算</strong>（相似变换），3 个更稳，4 个以上最准（能吸收拉伸和透视）。
+            两点要尽量离得远。
+            <br />
             本地图的世界坐标范围：X {map.bounds.minX}~{map.bounds.maxX}，Z {map.bounds.minZ}~
             {map.bounds.maxZ}（超出范围会提示）
           </p>

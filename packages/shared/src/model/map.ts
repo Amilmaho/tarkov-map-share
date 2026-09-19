@@ -24,7 +24,7 @@ export const CalibrationSchema = z.object({
     height: z.number().int().positive(),
   }),
   rotation: z.number().finite().min(-180).max(180).default(0),
-  controlPoints: z.array(ControlPointSchema).min(4, "至少需要 4 个控制点").max(64),
+  controlPoints: z.array(ControlPointSchema).min(2, "至少需要 2 个控制点").max(64),
   source: z.object({
     name: z.string().min(1).max(128),
     url: z.string().max(512).optional(),

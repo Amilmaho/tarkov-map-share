@@ -7,7 +7,8 @@
 import {
   type Calibration,
   type Matrix3,
-  buildHomographyFromCalibration,
+  type MappingModel,
+  buildTransformFromCalibration,
   reprojectionError,
 } from "@tarkov-map-share/shared";
 
@@ -17,10 +18,27 @@ export type CalibrationDraftPoint = {
   world: { x: number; z: number } | null;
 };
 
-export const MIN_CALIBRATION_POINTS = 4;
+/**
+ * 最少 2 个控制点：2 点解相似变换（等比缩放 + 旋转 + 平移），
+ * 3 点解仿射，4 点以上解单应。点越多越准，也越能发现选点错误。
+ */
+export const MIN_CALIBRATION_POINTS = 2;
+
+export const MODEL_LABELS: Record<MappingModel, string> = {
+  similarity: "相似变换（2 点）",
+  affine: "仿射变换（3 点）",
+  homography: "单应变换（4 点以上）",
+};
 
 export type CalibrationBuildResult =
-  | { ok: true; calibration: Calibration; homography: Matrix3; rmsError: number; warnings: string[] }
+  | {
+      ok: true;
+      calibration: Calibration;
+      homography: Matrix3;
+      model: MappingModel;
+      rmsError: number;
+      warnings: string[];
+    }
   | { ok: false; reason: string };
 
 export type WorldBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -79,7 +97,7 @@ export function buildCalibration(input: {
   };
 
   try {
-    const build = buildHomographyFromCalibration(calibration);
+    const build = buildTransformFromCalibration(calibration);
     const warnings = [...build.warnings];
     if (input.bounds !== undefined) {
       warnings.push(...checkPointsWithinBounds(filled, input.bounds));
@@ -88,6 +106,7 @@ export function buildCalibration(input: {
       ok: true,
       calibration,
       homography: build.homography,
+      model: build.model,
       rmsError: build.rmsError,
       warnings,
     };

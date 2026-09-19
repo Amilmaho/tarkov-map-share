@@ -19,6 +19,8 @@ export type MappingPoint = {
 };
 
 const MIN_CONTROL_POINTS = 4;
+const MIN_SIMILARITY_POINTS = 2;
+const MIN_AFFINE_POINTS = 3;
 const SINGULAR_TOLERANCE = 1e-12;
 
 function at(matrix: Matrix3, index: number): number {
@@ -271,6 +273,129 @@ export function solveHomography(points: readonly MappingPoint[]): Matrix3 {
 
   const denormalizeImage = invertMatrix3(imageTransform);
   return multiplyMatrix3(multiplyMatrix3(denormalizeImage, normalizedHomography), worldTransform);
+}
+
+/**
+ * 由 2 个及以上控制点求解**相似变换**（等比缩放 + 旋转 + 平移）。
+ *
+ * 适合"地图素材等比绘制、没有透视畸变"的情况（本项目用的矢量图正是如此）：
+ * 只要两个点就能定出来，比四点单应省事得多。
+ *
+ * 模型：px = a·x − b·z + tx，py = b·x + a·z + ty
+ */
+export function solveSimilarity(points: readonly MappingPoint[]): Matrix3 {
+  if (points.length < MIN_SIMILARITY_POINTS) {
+    throw new Error(`相似变换至少需要 ${MIN_SIMILARITY_POINTS} 个控制点，当前只有 ${points.length} 个`);
+  }
+  assertFinitePoints(points);
+
+  const count = points.length;
+  const worldMeanX = points.reduce((sum, point) => sum + point.world.x, 0) / count;
+  const worldMeanZ = points.reduce((sum, point) => sum + point.world.z, 0) / count;
+  const imageMeanX = points.reduce((sum, point) => sum + point.image.px, 0) / count;
+  const imageMeanY = points.reduce((sum, point) => sum + point.image.py, 0) / count;
+
+  let squares = 0;
+  let sumA = 0;
+  let sumB = 0;
+  for (const point of points) {
+    const dx = point.world.x - worldMeanX;
+    const dz = point.world.z - worldMeanZ;
+    const dpx = point.image.px - imageMeanX;
+    const dpy = point.image.py - imageMeanY;
+    squares += dx * dx + dz * dz;
+    sumA += dx * dpx + dz * dpy;
+    sumB += dx * dpy - dz * dpx;
+  }
+
+  if (squares < 1e-12) {
+    throw new Error("控制点退化：所有世界坐标几乎重合");
+  }
+
+  const a = sumA / squares;
+  const b = sumB / squares;
+  const tx = imageMeanX - (a * worldMeanX - b * worldMeanZ);
+  const ty = imageMeanY - (b * worldMeanX + a * worldMeanZ);
+
+  return [a, -b, tx, b, a, ty, 0, 0, 1];
+}
+
+/**
+ * 由 3 个及以上控制点求解**仿射变换**（允许 x、z 两轴比例不同）。
+ *
+ * 介于相似变换与单应之间：能吸收素材被非等比拉伸的情况，3 个点即可。
+ */
+export function solveAffine(points: readonly MappingPoint[]): Matrix3 {
+  if (points.length < MIN_AFFINE_POINTS) {
+    throw new Error(`仿射变换至少需要 ${MIN_AFFINE_POINTS} 个控制点，当前只有 ${points.length} 个`);
+  }
+  assertFinitePoints(points);
+
+  const fitAxis = (target: (point: MappingPoint) => number): number[] => {
+    const normal = [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ];
+    const rhs = [0, 0, 0];
+
+    for (const point of points) {
+      const row = [point.world.x, point.world.z, 1];
+      const value = target(point);
+      for (let i = 0; i < 3; i += 1) {
+        const left = row[i] ?? 0;
+        rhs[i] = (rhs[i] ?? 0) + left * value;
+        for (let j = 0; j < 3; j += 1) {
+          setCell(normal, i, j, cell(normal, i, j) + left * (row[j] ?? 0));
+        }
+      }
+    }
+
+    return solveLinearSystem(normal, rhs);
+  };
+
+  const forX = fitAxis((point) => point.image.px);
+  const forY = fitAxis((point) => point.image.py);
+
+  return [
+    forX[0] ?? 0,
+    forX[1] ?? 0,
+    forX[2] ?? 0,
+    forY[0] ?? 0,
+    forY[1] ?? 0,
+    forY[2] ?? 0,
+    0,
+    0,
+    1,
+  ];
+}
+
+export type MappingModel = "similarity" | "affine" | "homography";
+
+/**
+ * 按控制点数量自动选择模型：
+ * 2 点 → 相似变换；3 点 → 仿射；4 点及以上 → 单应（最准，能吃透视）。
+ */
+export function solveMapping(points: readonly MappingPoint[]): { model: MappingModel; matrix: Matrix3 } {
+  if (points.length >= MIN_CONTROL_POINTS) {
+    return { model: "homography", matrix: solveHomography(points) };
+  }
+  if (points.length >= MIN_AFFINE_POINTS) {
+    return { model: "affine", matrix: solveAffine(points) };
+  }
+  if (points.length >= MIN_SIMILARITY_POINTS) {
+    return { model: "similarity", matrix: solveSimilarity(points) };
+  }
+  throw new Error(`标定至少需要 ${MIN_SIMILARITY_POINTS} 个控制点，当前只有 ${points.length} 个`);
+}
+
+function assertFinitePoints(points: readonly MappingPoint[]): void {
+  for (const point of points) {
+    assertFinite(point.world.x, "控制点 world.x");
+    assertFinite(point.world.z, "控制点 world.z");
+    assertFinite(point.image.px, "控制点 image.px");
+    assertFinite(point.image.py, "控制点 image.py");
+  }
 }
 
 /** 世界坐标 → 地图像素坐标 */
