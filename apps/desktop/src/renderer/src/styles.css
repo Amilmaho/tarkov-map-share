@@ -191,6 +191,19 @@ body {
   background: color-mix(in oklab, var(--warn) 10%, transparent);
 }
 
+.panel__bundle {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.panel__bundle code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+
 .panel__notice .panel__hint {
   margin-bottom: 6px;
 }

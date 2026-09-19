@@ -25,6 +25,8 @@ export function App() {
       useMapStore.getState().setAppInfo(info);
       useMapStore.getState().setWatcher(status);
       if (latest !== null) useMapStore.getState().applyCapture(latest);
+      // 先加载共享标定包，再决定当前地图用哪份标定
+      await useMapStore.getState().loadSharedBundle();
       await useMapStore.getState().loadCalibration();
     })();
 

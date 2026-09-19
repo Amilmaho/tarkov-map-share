@@ -36,7 +36,7 @@ export type MapAsset = {
  * 开发时页面来自 http://localhost:5173，打包后来自 file://.../out/renderer/index.html，
  * 直接写 `/maps/x.webp` 在 file:// 下会被解析到文件系统根目录，因此必须基于 document 解析。
  */
-function assetUrl(path: string): string {
+export function assetUrl(path: string): string {
   return new URL(path.replace(/^\/+/, ""), document.baseURI).href;
 }
 

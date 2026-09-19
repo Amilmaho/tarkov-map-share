@@ -5,7 +5,13 @@ import { BrowserWindow, app, dialog, ipcMain, shell } from "electron";
 import type { Calibration } from "@tarkov-map-share/shared";
 
 import type { AppInfo } from "../shared/ipc";
-import { loadCalibration, saveCalibration } from "./calibration-store";
+import {
+  exportBundle,
+  importBundle,
+  listCalibrations,
+  loadCalibration,
+  saveCalibration,
+} from "./calibration-store";
 import { createScreenshotWatcher, defaultScreenshotDirectory } from "./screenshot-watcher";
 
 let mainWindow: BrowserWindow | null = null;
@@ -105,6 +111,35 @@ function registerIpcHandlers(): void {
   ipcMain.handle("calibration:save", async (_event, mapId: unknown, calibration: unknown) => {
     if (typeof mapId !== "string") throw new Error("mapId 必须是字符串");
     return await saveCalibration(app.getPath("userData"), calibration as Calibration);
+  });
+
+  ipcMain.handle("calibration:list", async () => await listCalibrations(app.getPath("userData")));
+
+  ipcMain.handle("calibration:export", async () => {
+    const result = await dialog.showSaveDialog({
+      title: "导出标定包",
+      defaultPath: "tarkov-map-calibrations.json",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (result.canceled || result.filePath === undefined || result.filePath === "") return null;
+
+    const mapCount = await exportBundle(app.getPath("userData"), result.filePath);
+    return { path: result.filePath, mapCount };
+  });
+
+  ipcMain.handle("calibration:import", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "导入标定包",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+
+    const filePath = result.filePaths[0];
+    if (filePath === undefined) return null;
+
+    const mapIds = await importBundle(app.getPath("userData"), filePath);
+    return { mapCount: mapIds.length, mapIds };
   });
 }
 

@@ -31,6 +31,9 @@ const api: DesktopApi = {
     load: (mapId: string) => ipcRenderer.invoke("calibration:load", mapId),
     save: (mapId: string, calibration: Calibration) =>
       ipcRenderer.invoke("calibration:save", mapId, calibration),
+    list: () => ipcRenderer.invoke("calibration:list"),
+    exportBundle: () => ipcRenderer.invoke("calibration:export"),
+    importBundle: () => ipcRenderer.invoke("calibration:import"),
   },
 };
 

@@ -29,6 +29,18 @@ export type ScreenshotWatcherStatus = {
 
 export type CalibrationSaveInput = Calibration;
 
+/** 导出标定包的结果 */
+export type CalibrationBundleExport = {
+  path: string;
+  mapCount: number;
+};
+
+/** 导入标定包的结果 */
+export type CalibrationBundleImport = {
+  mapCount: number;
+  mapIds: string[];
+};
+
 export type DesktopApi = {
   appInfo: () => Promise<AppInfo>;
   screenshots: {
@@ -43,5 +55,10 @@ export type DesktopApi = {
   calibration: {
     load: (mapId: string) => Promise<Calibration | null>;
     save: (mapId: string, calibration: CalibrationSaveInput) => Promise<void>;
+    /** 列出本机已有的全部标定 */
+    list: () => Promise<Record<string, Calibration>>;
+    /** 导出成一个文件，发给别人导入 */
+    exportBundle: () => Promise<CalibrationBundleExport | null>;
+    importBundle: () => Promise<CalibrationBundleImport | null>;
   };
 };

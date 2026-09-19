@@ -15,18 +15,21 @@ import {
 
 import type { AppInfo, ScreenshotWatcherStatus } from "../../shared/ipc";
 import {
+  type CalibrationBundle,
   type CalibrationDraftPoint,
   MODEL_LABELS,
   buildCalibration,
   calibrationQuality,
+  parseBundle,
   presetCalibration,
+  shiftCalibration,
 } from "./calibration";
-import { DEFAULT_MAP_ID, findMap, findMapOrNull } from "./maps";
+import { DEFAULT_MAP_ID, assetUrl, findMap, findMapOrNull } from "./maps";
 
-export type InteractionMode = "view" | "marker" | "self" | "calibrate";
+export type InteractionMode = "view" | "marker" | "self" | "calibrate" | "shift";
 
-/** 当前标定从哪来：预置（来自地图元数据，未核对）/ 用户自己标的 / 没有 */
-export type CalibrationSource = "none" | "preset" | "user";
+/** 标定来源：随应用分发的共享包 / 元数据预置（未核对）/ 用户自己标的 / 没有 */
+export type CalibrationSource = "none" | "preset" | "shared" | "user";
 
 export type SelfPosition = {
   position: WorldPosition;
@@ -68,6 +71,8 @@ type MapStore = {
   latestCapture: ScreenshotCapture | null;
   calibration: Calibration | null;
   calibrationSource: CalibrationSource;
+  /** 随应用分发的共享标定包，只在本机没有该图标定时使用 */
+  sharedCalibrations: Record<string, Calibration>;
   homography: Matrix3 | null;
   calibrationRms: number | null;
   calibrationNote: string | null;
@@ -100,6 +105,10 @@ type MapStore = {
 
   setCalibration: (calibration: Calibration | null, source?: CalibrationSource) => void;
   applyPresetCalibration: (mapId: string) => void;
+  applyShift: (targetPixel: { px: number; py: number }) => boolean;
+  loadSharedBundle: () => Promise<void>;
+  exportBundle: () => Promise<{ ok: boolean; message: string }>;
+  importBundle: () => Promise<{ ok: boolean; message: string }>;
   addDraftPoint: (point: CalibrationDraftPoint) => void;
   updateDraftPoint: (index: number, patch: Partial<CalibrationDraftPoint>) => void;
   removeDraftPoint: (index: number) => void;
@@ -126,6 +135,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
   latestCapture: null,
   calibration: null,
   calibrationSource: "none",
+  sharedCalibrations: {},
   homography: null,
   calibrationRms: null,
   calibrationNote: null,
@@ -276,7 +286,8 @@ export const useMapStore = create<MapStore>((set, get) => ({
     }
 
     const quality = calibrationQuality(built.rmsError);
-    const prefix = source === "preset" ? "预置标定（未核对） · " : "";
+    const prefix =
+      source === "preset" ? "预置标定（未核对） · " : source === "shared" ? "共享标定包 · " : "";
     const model = MODEL_LABELS[built.model];
     set({
       calibration,
@@ -302,6 +313,72 @@ export const useMapStore = create<MapStore>((set, get) => ({
       }),
       "preset",
     );
+  },
+
+  applyShift: (targetPixel) => {
+    const { calibration, self } = get();
+    if (calibration === null) {
+      set({ notice: "还没有标定：先标定这张图，或点「试用预置标定」" });
+      return false;
+    }
+    if (self === null) {
+      set({ notice: "还没有位置：先回游戏按一次截图键，再回来点图上你实际所在的位置" });
+      return false;
+    }
+
+    const shifted = shiftCalibration(calibration, { x: self.position.x, z: self.position.z }, targetPixel);
+    if (shifted === null) {
+      set({ notice: "校正失败：当前标定数据不可用" });
+      return false;
+    }
+
+    get().setCalibration(shifted, "user");
+    set({
+      mode: "view",
+      notice: "已按你的位置整体平移标定；换个位置再按一次截图就能验证比例对不对。",
+    });
+    void get().saveCalibration();
+    return true;
+  },
+
+  loadSharedBundle: async () => {
+    try {
+      const response = await fetch(assetUrl("calibrations/default.json"));
+      if (!response.ok) return;
+      const bundle: CalibrationBundle | null = parseBundle(JSON.parse(await response.text()));
+      if (bundle === null) return;
+      set({ sharedCalibrations: bundle.calibrations });
+    } catch {
+      // 没有共享标定包是正常情况
+    }
+  },
+
+  exportBundle: async () => {
+    const api = window.desktopApi;
+    if (api === undefined) return { ok: false, message: "当前不在桌面端环境中，无法导出" };
+    try {
+      const result = await api.calibration.exportBundle();
+      if (result === null) return { ok: false, message: "已取消导出" };
+      return {
+        ok: true,
+        message: `已导出 ${result.mapCount} 张地图的标定：${result.path}（把这个文件发给朋友导入即可）`,
+      };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  importBundle: async () => {
+    const api = window.desktopApi;
+    if (api === undefined) return { ok: false, message: "当前不在桌面端环境中，无法导入" };
+    try {
+      const result = await api.calibration.importBundle();
+      if (result === null) return { ok: false, message: "已取消导入" };
+      await get().loadCalibration();
+      return { ok: true, message: `已导入 ${result.mapCount} 张地图的标定` };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
   },
 
   addDraftPoint: (point) => set({ draftPoints: [...get().draftPoints, point], notice: null }),
@@ -378,9 +455,15 @@ export const useMapStore = create<MapStore>((set, get) => ({
       }
     }
 
-    // 没有本机标定时**不**自动套用预置值：
-    // 预置值按地图元数据推算，实测与素材的实际覆盖范围不一致（见 docs/MAP_COORDINATES.md 8.2），
-    // 静默套用会让用户以为"点位就是对的"。改为在标定面板里提供"试用预置标定"按钮。
+    // 顺序：本机标定 → 随应用分发的共享标定包 → 什么都没有。
+    // 不自动套用"元数据预置值"：它与素材实际覆盖范围不一致（见 docs/MAP_COORDINATES.md 8.2），
+    // 静默套用会让用户以为点位是对的；预置值改为标定面板里的「试用预置标定」按钮。
+    const shared = get().sharedCalibrations[mapId];
+    if (shared !== undefined) {
+      get().setCalibration(shared, "shared");
+      return;
+    }
+
     get().setCalibration(null);
   },
 }));

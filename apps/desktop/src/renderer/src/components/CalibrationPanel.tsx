@@ -14,6 +14,7 @@ export function CalibrationPanel() {
   const latestCapture = useMapStore((state) => state.latestCapture);
   const mapId = useMapStore((state) => state.mapId);
   const calibrationSource = useMapStore((state) => state.calibrationSource);
+  const self = useMapStore((state) => state.self);
   const [message, setMessage] = useState<Message | null>(null);
   const map = findMap(mapId);
 
@@ -64,6 +65,25 @@ export function CalibrationPanel() {
     });
   };
 
+  const startShift = (): void => {
+    if (self === null) {
+      setMessage({ ok: false, text: "还没有位置：先回游戏按一次截图键，再回来点图上你实际所在的位置" });
+      return;
+    }
+    useMapStore.getState().setMode("shift");
+    setMessage({ ok: true, text: "现在在图上点一下你实际所在的位置（对照你那张标注图）" });
+  };
+
+  const exportBundle = async (): Promise<void> => {
+    const result = await useMapStore.getState().exportBundle();
+    setMessage({ ok: result.ok, text: result.message });
+  };
+
+  const importBundle = async (): Promise<void> => {
+    const result = await useMapStore.getState().importBundle();
+    setMessage({ ok: result.ok, text: result.message });
+  };
+
   return (
     <section className="panel">
       <header className="panel__head">
@@ -109,6 +129,14 @@ export function CalibrationPanel() {
           <div className="panel__actions">
             <button type="button" className="btn btn--primary" onClick={startCalibration}>
               {calibration === null ? "开始标定" : "重新标定"}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={calibration === null || self === null}
+              onClick={startShift}
+            >
+              用我的位置校正
             </button>
             {calibration === null ? (
               <button type="button" className="btn" onClick={tryPreset}>
@@ -215,6 +243,21 @@ export function CalibrationPanel() {
       {message !== null ? (
         <p className={message.ok ? "panel__message" : "panel__message panel__message--bad"}>{message.text}</p>
       ) : null}
+
+      <div className="panel__bundle">
+        <p className="panel__hint">
+          全部图标完后点「导出标定包」，把文件发给朋友——他们在同一位置点「导入」就能直接用，
+          不用自己标。放到应用目录的 <code>calibrations/default.json</code> 还能随版本一起分发。
+        </p>
+        <div className="panel__actions">
+          <button type="button" className="btn" onClick={() => void exportBundle()}>
+            导出标定包
+          </button>
+          <button type="button" className="btn" onClick={() => void importBundle()}>
+            导入标定包
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

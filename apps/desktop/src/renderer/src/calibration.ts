@@ -6,11 +6,79 @@
 
 import {
   type Calibration,
+  CalibrationSchema,
   type Matrix3,
   type MappingModel,
   buildTransformFromCalibration,
   reprojectionError,
+  worldToImage,
 } from "@tarkov-map-share/shared";
+
+/** 标定包：把自己的标定发给别人，导进去就能用 */
+export type CalibrationBundle = {
+  version: 1;
+  exportedAt: number;
+  calibrations: Record<string, Calibration>;
+};
+
+export const BUNDLE_VERSION = 1;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * 解析标定包，逐张校验；坏掉的条目直接跳过而不是整体失败。
+ *
+ * 返回 null 表示根本不是标定包（版本不符或结构不对）。
+ */
+export function parseBundle(input: unknown): CalibrationBundle | null {
+  if (!isRecord(input)) return null;
+  if (input.version !== BUNDLE_VERSION) return null;
+
+  const raw = input.calibrations;
+  if (!isRecord(raw)) return null;
+
+  const calibrations: Record<string, Calibration> = {};
+  for (const [mapId, value] of Object.entries(raw)) {
+    const parsed = CalibrationSchema.safeParse(value);
+    if (parsed.success && parsed.data.mapId === mapId) calibrations[mapId] = parsed.data;
+  }
+
+  const exportedAt = typeof input.exportedAt === "number" ? input.exportedAt : Date.now();
+  return { version: BUNDLE_VERSION, exportedAt, calibrations };
+}
+
+/**
+ * 单点平移校正：把整份标定平移，使 worldPoint 落在 targetPixel 上。
+ *
+ * 用来快速修正"方向比例都对、只是整体偏移"的地图——预置标定往往就是这个毛病。
+ * 平移不改变缩放与旋转，所以如果比例本身错了，这个方法救不回来。
+ */
+export function shiftCalibration(
+  calibration: Calibration,
+  worldPoint: { x: number; z: number },
+  targetPixel: { px: number; py: number },
+): Calibration | null {
+  try {
+    const { homography } = buildTransformFromCalibration(calibration);
+    const current = worldToImage(homography, worldPoint);
+    const offsetX = targetPixel.px - current.px;
+    const offsetY = targetPixel.py - current.py;
+
+    if (!Number.isFinite(offsetX) || !Number.isFinite(offsetY)) return null;
+
+    return {
+      ...calibration,
+      controlPoints: calibration.controlPoints.map((point) => ({
+        ...point,
+        image: { px: point.image.px + offsetX, py: point.image.py + offsetY },
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
 
 export type CalibrationDraftPoint = {
   image: { px: number; py: number };

@@ -282,6 +282,11 @@ export function MapCanvas() {
       return;
     }
 
+    if (state.mode === "shift") {
+      state.applyShift(screenToImage(currentViewport, point));
+      return;
+    }
+
     // 选择模式：点击已有标记则选中，点空白处取消选中
     const homography = state.homography;
     if (homography !== null) {
