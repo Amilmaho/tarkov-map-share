@@ -23,11 +23,40 @@ export type CalibrationBuildResult =
   | { ok: true; calibration: Calibration; homography: Matrix3; rmsError: number; warnings: string[] }
   | { ok: false; reason: string };
 
+export type WorldBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
+
+/**
+ * 检查控制点的世界坐标是否落在地图范围内。
+ *
+ * 这是最划算的一道防错：坐标填错图（比如把森林的坐标填到海关）、或者少打一个负号，
+ * 都会立刻表现为"位置画到地图外面"，与其事后猜，不如当场提示。
+ */
+export function checkPointsWithinBounds(
+  points: readonly CalibrationDraftPoint[],
+  bounds: WorldBounds,
+): string[] {
+  const warnings: string[] = [];
+
+  points.forEach((point, index) => {
+    if (point.world === null) return;
+    const { x, z } = point.world;
+    if (x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ) {
+      warnings.push(
+        `控制点 ${index + 1} 的坐标 (${x.toFixed(1)}, ${z.toFixed(1)}) 超出本地图范围` +
+          `（X ${bounds.minX}~${bounds.maxX}，Z ${bounds.minZ}~${bounds.maxZ}）`,
+      );
+    }
+  });
+
+  return warnings;
+}
+
 export function buildCalibration(input: {
   mapId: string;
   image: { src: string; width: number; height: number };
   source: { name: string; license: string; url?: string | undefined };
   points: readonly CalibrationDraftPoint[];
+  bounds?: WorldBounds;
 }): CalibrationBuildResult {
   const filled = input.points.filter((point) => point.world !== null);
   if (filled.length < MIN_CALIBRATION_POINTS) {
@@ -51,12 +80,16 @@ export function buildCalibration(input: {
 
   try {
     const build = buildHomographyFromCalibration(calibration);
+    const warnings = [...build.warnings];
+    if (input.bounds !== undefined) {
+      warnings.push(...checkPointsWithinBounds(filled, input.bounds));
+    }
     return {
       ok: true,
       calibration,
       homography: build.homography,
       rmsError: build.rmsError,
-      warnings: build.warnings,
+      warnings,
     };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) };

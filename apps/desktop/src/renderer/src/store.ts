@@ -229,6 +229,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       image: calibration.image,
       source: calibration.source,
       points: calibration.controlPoints.map((point) => ({ image: point.image, world: point.world })),
+      bounds: findMap(calibration.mapId).bounds,
     });
 
     if (!built.ok) {
@@ -265,6 +266,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       image: { src: map.imageUrl, width: map.width, height: map.height },
       source: map.source,
       points: draftPoints,
+      bounds: map.bounds,
     });
 
     if (!built.ok) return { ok: false, message: built.reason };
@@ -274,10 +276,17 @@ export const useMapStore = create<MapStore>((set, get) => ({
       calibration: built.calibration,
       homography: built.homography,
       calibrationRms: built.rmsError,
-      calibrationNote: `重投影误差 ${built.rmsError.toFixed(2)} 像素（${quality.label}）`,
+      calibrationNote:
+        `重投影误差 ${built.rmsError.toFixed(2)} 像素（${quality.label}）` +
+        (built.warnings.length > 0 ? `；${built.warnings.join("；")}` : ""),
       mode: "view",
     });
-    return { ok: true, message: `标定完成：重投影误差 ${built.rmsError.toFixed(2)} 像素` };
+    return {
+      ok: true,
+      message:
+        `标定完成：重投影误差 ${built.rmsError.toFixed(2)} 像素` +
+        (built.warnings.length > 0 ? `；注意：${built.warnings[0]}` : ""),
+    };
   },
 
   saveCalibration: async () => {

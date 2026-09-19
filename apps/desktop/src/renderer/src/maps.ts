@@ -5,6 +5,18 @@ export type MapAsset = {
   imageUrl: string;
   width: number;
   height: number;
+  /**
+   * 本图覆盖的世界坐标范围（单位米）。
+   *
+   * 海关的数值取自 tarkov.dev 的开源地图元数据（bounds: [[698, -307], [-372, 237]]），
+   * 用于校验标定时输入的坐标是否落在本图范围内——填错图或填错数是最常见的错误来源。
+   */
+  bounds: {
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+  };
   source: {
     name: string;
     license: string;
@@ -35,6 +47,7 @@ export const MAPS: readonly MapAsset[] = [
     imageUrl: assetUrl("maps/customs.webp"),
     width: 4608,
     height: 2691,
+    bounds: { minX: -372, maxX: 698, minZ: -307, maxZ: 237 },
     source: {
       name: "玩家提供的社区地图",
       license: "待确认（见 docs/MAP_COORDINATES.md 资源清单）",

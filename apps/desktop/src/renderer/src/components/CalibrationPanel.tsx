@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { findMap } from "../maps";
 import { useMapStore } from "../store";
 
 type Message = { ok: boolean; text: string };
@@ -10,7 +11,9 @@ export function CalibrationPanel() {
   const calibration = useMapStore((state) => state.calibration);
   const note = useMapStore((state) => state.calibrationNote);
   const latestCapture = useMapStore((state) => state.latestCapture);
+  const mapId = useMapStore((state) => state.mapId);
   const [message, setMessage] = useState<Message | null>(null);
+  const map = findMap(mapId);
 
   const startCalibration = (): void => {
     useMapStore.getState().clearDraft();
@@ -76,6 +79,9 @@ export function CalibrationPanel() {
         <>
           <p className="panel__hint">
             步骤：在图上点一下地标 → 填它的世界坐标（X 与 Z）。至少 4 个点，分布越开越准。
+            <br />
+            本地图的世界坐标范围：X {map.bounds.minX}~{map.bounds.maxX}，Z {map.bounds.minZ}~
+            {map.bounds.maxZ}（超出范围会提示）
           </p>
 
           <ol className="points">

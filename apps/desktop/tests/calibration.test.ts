@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCalibration, calibrationQuality } from "../src/renderer/src/calibration";
+import {
+  buildCalibration,
+  calibrationQuality,
+  checkPointsWithinBounds,
+} from "../src/renderer/src/calibration";
 
 const image = { src: "/maps/customs.webp", width: 1600, height: 1600 };
 const source = { name: "测试用合成标定", license: "内部测试数据" };
@@ -84,5 +88,58 @@ describe("calibrationQuality", () => {
     expect(calibrationQuality(0.5).level).toBe("good");
     expect(calibrationQuality(2).level).toBe("warn");
     expect(calibrationQuality(9).level).toBe("bad");
+  });
+});
+
+describe("checkPointsWithinBounds", () => {
+  const bounds = { minX: -372, maxX: 698, minZ: -307, maxZ: 237 };
+
+  it("范围内的点不产生警告", () => {
+    const warnings = checkPointsWithinBounds(
+      [
+        { image: { px: 0, py: 0 }, world: { x: -323.69, z: -225.63 } },
+        { image: { px: 10, py: 10 }, world: { x: 698, z: 237 } },
+      ],
+      bounds,
+    );
+
+    expect(warnings).toEqual([]);
+  });
+
+  it("超出范围的坐标会被点名提示", () => {
+    const warnings = checkPointsWithinBounds(
+      [
+        { image: { px: 0, py: 0 }, world: { x: 0, z: 0 } },
+        { image: { px: 10, py: 10 }, world: { x: -900, z: 500 } },
+      ],
+      bounds,
+    );
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("控制点 2");
+    expect(warnings[0]).toContain("-900.0");
+  });
+
+  it("未填世界坐标的点会被跳过", () => {
+    const warnings = checkPointsWithinBounds([{ image: { px: 0, py: 0 }, world: null }], bounds);
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe("buildCalibration 的坐标范围校验", () => {
+  const bounds = { minX: -500, maxX: 300, minZ: -400, maxZ: 400 };
+
+  it("传入范围后会把越界提示合并进结果", () => {
+    const result = buildCalibration({
+      mapId: "customs",
+      image,
+      source,
+      bounds,
+      points: corners.map((point) => ({ image: toPixel(point.x, point.z), world: point })),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.warnings).toEqual([]);
   });
 });
