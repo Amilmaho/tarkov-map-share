@@ -124,10 +124,10 @@ export function RoomPanel() {
   }
 
   const hostAddress = connection.hostAddresses[0];
-  const invite =
-    connection.role === "host" && hostAddress !== undefined && connection.hostPort !== null
-      ? `${hostAddress}:${connection.hostPort} ${room.id}`
-      : "";
+  const hostPort = connection.hostPort;
+  const isHost = connection.role === "host" && hostPort !== null;
+  const shareableAddresses = isHost ? connection.hostAddresses : [];
+  const invite = isHost && hostAddress !== undefined ? `${hostAddress}:${hostPort} ${room.id}` : "";
 
   const rows = Object.values(members).sort((a, b) => a.joinedAt - b.joinedAt);
 
@@ -152,9 +152,28 @@ export function RoomPanel() {
       </div>
 
       {invite !== "" ? (
-        <p className="path" title="把这行发给队友：他们填地址与房间码即可">
-          {invite}
-        </p>
+        <>
+          <p className="panel__hint">
+            把下面任一地址 + 房间码发给队友：同一个 WiFi 用 192.168 开头的；
+            异地要先用 Tailscale / ZeroTier 这类工具组成虚拟局域网，再用 100.x 开头的地址。
+          </p>
+          <ul className="member-list">
+            {shareableAddresses.map((address) => (
+              <li className="member-row" key={address}>
+                <span className="member-row__coords">
+                  {address}:{hostPort}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => void copy(`${address}:${hostPort} ${room.id}`, "邀请")}
+                >
+                  复制
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       ) : null}
 
       <p className="panel__hint">
