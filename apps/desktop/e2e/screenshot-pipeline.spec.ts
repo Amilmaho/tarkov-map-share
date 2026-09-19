@@ -15,8 +15,9 @@ const SAMPLE =
  */
 test("截图目录里出现新文件后，界面上能看到坐标", async () => {
   const directory = await mkdtemp(join(tmpdir(), "tms-e2e-screenshots-"));
+  const userData = await mkdtemp(join(tmpdir(), "tms-e2e-userdata-"));
   const app = await electron.launch({
-    args: ["."],
+    args: [".", `--user-data-dir=${userData}`],
     env: { ...process.env, TMS_SCREENSHOT_DIR: directory },
   });
 
@@ -29,15 +30,40 @@ test("截图目录里出现新文件后，界面上能看到坐标", async () =>
     await writeFile(join(directory, SAMPLE), "png");
 
     // 轮询间隔 1 秒，给足余量
+    // 等地图画出来，再记录整块画布的指纹，稍后确认"点真的画上去了"
+    await expect.poll(async () => await canvasSignature(window), { timeout: 10_000 }).toBeGreaterThan(0);
+    const canvasBefore = await canvasSignature(window);
+
     // 精确匹配侧栏里那行坐标（提示条里也会出现同样的数字）
     await expect(window.getByText("(-323.7, -225.6)", { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(window.getByText("游戏截图")).toBeVisible();
 
-    // 还没标定，必须明确告诉用户"坐标有，但画不到图上"
-    await expect(window.getByText(/已读到坐标/)).toBeVisible();
-    await expect(window.getByText(/地图还没有标定/)).toBeVisible();
+    // 预置标定已经生效，所以画布应当被重绘（多出"我"的点、朝向箭头与标签）
+    await expect
+      .poll(async () => (await canvasSignature(window)) !== canvasBefore, {
+        message: "收到位置后画布应当重绘",
+        timeout: 10_000,
+      })
+      .toBe(true);
   } finally {
     await app.close();
     await rm(directory, { recursive: true, force: true });
+    await rm(userData, { recursive: true, force: true });
   }
 });
+
+/** 整块画布的指纹，用来判断画布内容是否发生变化 */
+async function canvasSignature(window: import("@playwright/test").Page): Promise<number> {
+  return await window.evaluate(() => {
+    const element = document.querySelector("canvas");
+    if (element === null) return 0;
+    const ctx = element.getContext("2d");
+    if (ctx === null) return 0;
+    const data = ctx.getImageData(0, 0, element.width, element.height).data;
+    let sum = 0;
+    for (let index = 0; index < data.length; index += 16) {
+      sum = (sum + (data[index] ?? 0) + (data[index + 3] ?? 0)) % 2_147_483_647;
+    }
+    return sum;
+  });
+}

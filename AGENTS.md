@@ -127,6 +127,8 @@ npm run lint                # 代码风格检查
 10. **地图素材位置**：转换后的地图放在 `apps/desktop/src/renderer/public/maps/`，
     原始大图放仓库根的 `image/`（已在 .gitignore 中，不入库）；素材来源与许可必须登记到
     `docs/MAP_COORDINATES.md` 第 8 节。
+11. **地图素材与元数据由脚本生成**：不要手改 `maps.generated.ts` 或 `public/maps/*.webp`；
+    改 `tools/build-maps.mjs` 后重新生成，并同步更新 `docs/MAP_COORDINATES.md` 第 8 节。
 
 ---
 

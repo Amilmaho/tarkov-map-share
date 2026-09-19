@@ -103,4 +103,50 @@ export function calibrationQuality(rmsError: number): { level: "good" | "warn" |
   return { level: "bad", label: "偏差较大" };
 }
 
+/**
+ * 由地图元数据直接生成预置标定：把世界包围盒的四个角对应到图片四角。
+ *
+ * 成立的前提是地图素材本身就是按世界包围盒裁剪的（tarkov.dev 的矢量图就是这样），
+ * 而且已经按 coordinateRotation 旋正过。因此这仍然只是"预置值"，需要按一次截图核对。
+ */
+export function presetCalibration(input: {
+  mapId: string;
+  image: { src: string; width: number; height: number };
+  bounds: WorldBounds;
+  source: { name: string; license: string; url?: string | undefined };
+}): Calibration {
+  const { minX, maxX, minZ, maxZ } = input.bounds;
+  const { width, height } = input.image;
+
+  return {
+    mapId: input.mapId,
+    image: input.image,
+    rotation: 0,
+    controlPoints: [
+      { world: { x: minX, z: minZ }, image: { px: 0, py: 0 }, label: "角 1" },
+      { world: { x: maxX, z: minZ }, image: { px: width, py: 0 }, label: "角 2" },
+      { world: { x: maxX, z: maxZ }, image: { px: width, py: height }, label: "角 3" },
+      { world: { x: minX, z: maxZ }, image: { px: 0, py: height }, label: "角 4" },
+    ],
+    source: input.source,
+  };
+}
+
+/**
+ * 把标定整体旋转 180°。
+ *
+ * 矩形绕中心旋转 180° 仍然落在原位，所以这个操作既能修正"方向反了"的预置标定，
+ * 也能修正 90° 旋转方向取错导致的 180° 差异。
+ */
+export function rotateCalibration180(calibration: Calibration): Calibration {
+  const { width, height } = calibration.image;
+  return {
+    ...calibration,
+    controlPoints: calibration.controlPoints.map((point) => ({
+      ...point,
+      image: { px: width - point.image.px, py: height - point.image.py },
+    })),
+  };
+}
+
 export { reprojectionError };

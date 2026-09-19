@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { rotateCalibration180 } from "../calibration";
 import { findMap } from "../maps";
 import { useMapStore } from "../store";
 
@@ -12,6 +13,7 @@ export function CalibrationPanel() {
   const note = useMapStore((state) => state.calibrationNote);
   const latestCapture = useMapStore((state) => state.latestCapture);
   const mapId = useMapStore((state) => state.mapId);
+  const calibrationSource = useMapStore((state) => state.calibrationSource);
   const [message, setMessage] = useState<Message | null>(null);
   const map = findMap(mapId);
 
@@ -43,6 +45,17 @@ export function CalibrationPanel() {
     setMessage({ ok: saved.ok, text: `${result.message}；${saved.message}` });
   };
 
+  const flip180 = (): void => {
+    const store = useMapStore.getState();
+    const current = store.calibration;
+    if (current === null) return;
+    store.setCalibration(rotateCalibration180(current), store.calibrationSource);
+    setMessage({
+      ok: true,
+      text: "已翻转 180°：按一次截图核对，确认无误后点「计算并保存」把它固定下来",
+    });
+  };
+
   return (
     <section className="panel">
       <header className="panel__head">
@@ -53,6 +66,20 @@ export function CalibrationPanel() {
       </header>
 
       {note !== null ? <p className="panel__note">{note}</p> : null}
+
+      {calibrationSource === "preset" ? (
+        <div className="panel__notice">
+          <p className="panel__hint">
+            这是根据 tarkov.dev 地图元数据<strong>预置</strong>的标定，还没有核对过。
+            按一次截图看点位对不对；如果方向正好相反，点「翻转 180°」，确认无误后点「计算并保存」存到本机。
+          </p>
+          <div className="panel__actions">
+            <button type="button" className="btn" onClick={flip180}>
+              翻转 180°
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {mode !== "calibrate" ? (
         <>

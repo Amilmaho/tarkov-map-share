@@ -31,6 +31,8 @@ assets/maps/**/*.png
 assets/maps/**/*.jpg
 # 原始素材暂存目录：转换后的素材放在 apps/desktop/src/renderer/public/maps/
 image/
+# 地图构建脚本的下载缓存
+tools/.cache/
 
 # 系统与编辑器
 .DS_Store

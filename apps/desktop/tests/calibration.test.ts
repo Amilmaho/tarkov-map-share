@@ -4,6 +4,8 @@ import {
   buildCalibration,
   calibrationQuality,
   checkPointsWithinBounds,
+  presetCalibration,
+  rotateCalibration180,
 } from "../src/renderer/src/calibration";
 
 const image = { src: "/maps/customs.webp", width: 1600, height: 1600 };
@@ -141,5 +143,62 @@ describe("buildCalibration 的坐标范围校验", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.warnings).toEqual([]);
+  });
+});
+
+describe("presetCalibration", () => {
+  const bounds = { minX: -372, maxX: 698, minZ: -307, maxZ: 237 };
+  const preset = presetCalibration({
+    mapId: "customs",
+    image: { src: "/maps/customs.webp", width: 4096, height: 2082 },
+    bounds,
+    source: { name: "tarkov.dev 元数据", license: "MIT" },
+  });
+
+  it("把世界包围盒的四角对应到图片四角", () => {
+    expect(preset.controlPoints).toHaveLength(4);
+    expect(preset.controlPoints[0]?.world).toEqual({ x: -372, z: -307 });
+    expect(preset.controlPoints[0]?.image).toEqual({ px: 0, py: 0 });
+    expect(preset.controlPoints[1]?.image).toEqual({ px: 4096, py: 0 });
+    expect(preset.controlPoints[2]?.image).toEqual({ px: 4096, py: 2082 });
+    expect(preset.controlPoints[3]?.image).toEqual({ px: 0, py: 2082 });
+  });
+
+  it("可以直接解出接近零误差的单应矩阵", () => {
+    const built = buildCalibration({
+      mapId: "customs",
+      image: { src: "/maps/customs.webp", width: 4096, height: 2082 },
+      source: { name: "tarkov.dev 元数据", license: "MIT" },
+      points: preset.controlPoints.map((point) => ({ image: point.image, world: point.world })),
+      bounds,
+    });
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.rmsError).toBeLessThan(0.01);
+    expect(built.warnings).toEqual([]);
+  });
+});
+
+describe("rotateCalibration180", () => {
+  const bounds = { minX: -372, maxX: 698, minZ: -307, maxZ: 237 };
+  const preset = presetCalibration({
+    mapId: "customs",
+    image: { src: "/maps/customs.webp", width: 4096, height: 2082 },
+    bounds,
+    source: { name: "tarkov.dev 元数据", license: "MIT" },
+  });
+
+  it("图片坐标绕中心旋转，世界坐标保持不变", () => {
+    const flipped = rotateCalibration180(preset);
+
+    expect(flipped.controlPoints[0]?.image).toEqual({ px: 4096, py: 2082 });
+    expect(flipped.controlPoints[2]?.image).toEqual({ px: 0, py: 0 });
+    expect(flipped.controlPoints[0]?.world).toEqual({ x: -372, z: -307 });
+  });
+
+  it("翻转两次回到原状态", () => {
+    const twice = rotateCalibration180(rotateCalibration180(preset));
+    expect(twice.controlPoints).toEqual(preset.controlPoints);
   });
 });

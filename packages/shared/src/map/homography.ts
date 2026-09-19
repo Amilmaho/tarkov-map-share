@@ -103,11 +103,13 @@ function project(matrix: Matrix3, u: number, v: number): { a: number; b: number 
   };
 }
 
-function makeTranslationScale(center: number, scale: number): Matrix3 {
-  return [scale, 0, -scale * center, 0, scale, 0, 0, 0, 1];
-}
-
-function makeImageTranslationScale(centerX: number, centerY: number, scale: number): Matrix3 {
+/**
+ * 归一化矩阵：把 (x, y) 平移到原点并按 scale 缩放。
+ *
+ * 注意两个轴都要减各自的中心——只减一个轴会让反归一化后的单应矩阵带上一个常量偏移，
+ * 结果就是"控制点自洽但整体错位"。世界坐标与像素坐标共用这一份实现。
+ */
+function makeTranslationScale(centerX: number, centerY: number, scale: number): Matrix3 {
   return [scale, 0, -scale * centerX, 0, scale, -scale * centerY, 0, 0, 1];
 }
 
@@ -197,7 +199,7 @@ export function solveHomography(points: readonly MappingPoint[]): Matrix3 {
     throw new Error("控制点退化：所有世界坐标几乎重合");
   }
   const worldScale = Math.SQRT2 / worldDistance;
-  const worldTransform = makeTranslationScale(worldCenterX, worldScale);
+  const worldTransform = makeTranslationScale(worldCenterX, worldCenterZ, worldScale);
 
   const imageCenterX = points.reduce((sum, p) => sum + p.image.px, 0) / points.length;
   const imageCenterY = points.reduce((sum, p) => sum + p.image.py, 0) / points.length;
@@ -208,7 +210,7 @@ export function solveHomography(points: readonly MappingPoint[]): Matrix3 {
     throw new Error("控制点退化：所有像素坐标几乎重合");
   }
   const imageScale = Math.SQRT2 / imageDistance;
-  const imageTransform = makeImageTranslationScale(imageCenterX, imageCenterY, imageScale);
+  const imageTransform = makeTranslationScale(imageCenterX, imageCenterY, imageScale);
 
   const normalized: MappingPoint[] = points.map((point) => ({
     world: {

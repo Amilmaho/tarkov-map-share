@@ -1,6 +1,6 @@
 import type { MarkerKind } from "@tarkov-map-share/shared";
 
-import { findMap } from "../maps";
+import { MAPS, findMap } from "../maps";
 import { MARKER_KIND_COLORS, MARKER_KIND_LABELS, useMapStore } from "../store";
 
 const MARKER_KINDS: MarkerKind[] = ["danger", "loot", "extract", "quest", "note", "spawn"];
@@ -13,6 +13,7 @@ export function Toolbar() {
   const homography = useMapStore((state) => state.homography);
 
   const setMode = useMapStore((state) => state.setMode);
+  const selectMap = useMapStore((state) => state.selectMap);
   const setMarkerKind = useMapStore((state) => state.setMarkerKind);
   const zoomBy = useMapStore((state) => state.zoomBy);
   const resetView = useMapStore((state) => state.resetView);
@@ -22,7 +23,18 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar__group">
-        <span className="toolbar__title">{map.name}</span>
+        <select
+          className="select"
+          value={mapId}
+          aria-label="选择地图"
+          onChange={(event) => selectMap(event.target.value)}
+        >
+          {MAPS.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
         <span className={`badge ${homography !== null ? "badge--ok" : "badge--warn"}`}>
           {homography !== null ? "已标定" : "未标定"}
         </span>

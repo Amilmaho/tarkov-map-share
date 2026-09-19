@@ -14,10 +14,18 @@ import {
 } from "@tarkov-map-share/shared";
 
 import type { AppInfo, ScreenshotWatcherStatus } from "../../shared/ipc";
-import { type CalibrationDraftPoint, buildCalibration, calibrationQuality } from "./calibration";
-import { DEFAULT_MAP_ID, findMap } from "./maps";
+import {
+  type CalibrationDraftPoint,
+  buildCalibration,
+  calibrationQuality,
+  presetCalibration,
+} from "./calibration";
+import { DEFAULT_MAP_ID, findMap, findMapOrNull } from "./maps";
 
 export type InteractionMode = "view" | "marker" | "self" | "calibrate";
+
+/** 当前标定从哪来：预置（来自地图元数据，未核对）/ 用户自己标的 / 没有 */
+export type CalibrationSource = "none" | "preset" | "user";
 
 export type SelfPosition = {
   position: WorldPosition;
@@ -58,6 +66,7 @@ type MapStore = {
   self: SelfPosition | null;
   latestCapture: ScreenshotCapture | null;
   calibration: Calibration | null;
+  calibrationSource: CalibrationSource;
   homography: Matrix3 | null;
   calibrationRms: number | null;
   calibrationNote: string | null;
@@ -67,6 +76,7 @@ type MapStore = {
   notice: string | null;
 
   setCanvasSize: (size: { width: number; height: number }) => void;
+  selectMap: (mapId: string) => void;
   setMode: (mode: InteractionMode) => void;
   setMarkerKind: (kind: MarkerKind) => void;
   setViewport: (viewport: Viewport) => void;
@@ -87,7 +97,8 @@ type MapStore = {
   setWatcher: (status: ScreenshotWatcherStatus) => void;
   setAppInfo: (info: AppInfo) => void;
 
-  setCalibration: (calibration: Calibration | null) => void;
+  setCalibration: (calibration: Calibration | null, source?: CalibrationSource) => void;
+  applyPresetCalibration: (mapId: string) => void;
   addDraftPoint: (point: CalibrationDraftPoint) => void;
   updateDraftPoint: (index: number, patch: Partial<CalibrationDraftPoint>) => void;
   removeDraftPoint: (index: number) => void;
@@ -113,6 +124,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
   self: null,
   latestCapture: null,
   calibration: null,
+  calibrationSource: "none",
   homography: null,
   calibrationRms: null,
   calibrationNote: null,
@@ -122,6 +134,25 @@ export const useMapStore = create<MapStore>((set, get) => ({
   notice: null,
 
   setCanvasSize: (size) => set({ canvasSize: size }),
+  selectMap: (mapId) => {
+    if (findMapOrNull(mapId) === null || get().mapId === mapId) return;
+    set({
+      mapId,
+      markers: [],
+      selectedMarkerId: null,
+      calibration: null,
+      calibrationSource: "none",
+      homography: null,
+      calibrationRms: null,
+      calibrationNote: null,
+      draftPoints: [],
+      // 截图文件名里没有地图信息，所以切换地图后旧的自身位置不再可信
+      self: null,
+      fitted: false,
+      notice: null,
+    });
+    void get().loadCalibration();
+  },
   setMode: (mode) => set({ mode, notice: null }),
   setMarkerKind: (markerKind) => set({ markerKind, mode: "marker" }),
   setViewport: (viewport) => set({ viewport }),
@@ -218,9 +249,15 @@ export const useMapStore = create<MapStore>((set, get) => ({
   setWatcher: (watcher) => set({ watcher }),
   setAppInfo: (appInfo) => set({ appInfo }),
 
-  setCalibration: (calibration) => {
+  setCalibration: (calibration, source = "user") => {
     if (calibration === null) {
-      set({ calibration: null, homography: null, calibrationRms: null, calibrationNote: null });
+      set({
+        calibration: null,
+        calibrationSource: "none",
+        homography: null,
+        calibrationRms: null,
+        calibrationNote: null,
+      });
       return;
     }
 
@@ -233,18 +270,36 @@ export const useMapStore = create<MapStore>((set, get) => ({
     });
 
     if (!built.ok) {
-      set({ calibration, homography: null, calibrationNote: built.reason });
+      set({ calibration, calibrationSource: source, homography: null, calibrationNote: built.reason });
       return;
     }
 
     const quality = calibrationQuality(built.rmsError);
+    const prefix = source === "preset" ? "预置标定（未核对） · " : "";
     set({
       calibration,
+      calibrationSource: source,
       homography: built.homography,
       calibrationRms: built.rmsError,
-      calibrationNote: `重投影误差 ${built.rmsError.toFixed(2)} 像素（${quality.label}）`,
+      calibrationNote:
+        `${prefix}重投影误差 ${built.rmsError.toFixed(2)} 像素（${quality.label}）` +
+        (built.warnings.length > 0 ? `；${built.warnings.join("；")}` : ""),
       draftPoints: calibration.controlPoints.map((point) => ({ image: point.image, world: point.world })),
     });
+  },
+
+  applyPresetCalibration: (mapId) => {
+    const map = findMapOrNull(mapId);
+    if (map === null) return;
+    get().setCalibration(
+      presetCalibration({
+        mapId: map.id,
+        image: { src: map.imageUrl, width: map.width, height: map.height },
+        bounds: map.bounds,
+        source: map.source,
+      }),
+      "preset",
+    );
   },
 
   addDraftPoint: (point) => set({ draftPoints: [...get().draftPoints, point], notice: null }),
@@ -274,6 +329,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
     const quality = calibrationQuality(built.rmsError);
     set({
       calibration: built.calibration,
+      calibrationSource: "user",
       homography: built.homography,
       calibrationRms: built.rmsError,
       calibrationNote:
@@ -304,13 +360,22 @@ export const useMapStore = create<MapStore>((set, get) => ({
   },
 
   loadCalibration: async () => {
+    const mapId = get().mapId;
     const api = window.desktopApi;
-    if (api === undefined) return;
-    try {
-      const calibration = await api.calibration.load(get().mapId);
-      if (calibration !== null) get().setCalibration(calibration);
-    } catch {
-      // 读取失败按未标定处理
+
+    if (api !== undefined) {
+      try {
+        const saved = await api.calibration.load(mapId);
+        if (saved !== null) {
+          get().setCalibration(saved, "user");
+          return;
+        }
+      } catch {
+        // 读取失败就回退到预置标定
+      }
     }
+
+    // 没有本机标定时使用元数据预置值，用户按一次截图即可核对
+    get().applyPresetCalibration(mapId);
   },
 }));

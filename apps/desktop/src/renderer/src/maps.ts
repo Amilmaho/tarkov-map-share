@@ -1,26 +1,32 @@
+import { GENERATED_MAPS } from "./maps.generated";
+
+export type MapBounds = {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+};
+
 export type MapAsset = {
   id: string;
   name: string;
-  /** 渲染进程可直接使用的图片地址（由 Vite 提供） */
+  /** 渲染进程可直接使用的图片地址 */
   imageUrl: string;
   width: number;
   height: number;
-  /**
-   * 本图覆盖的世界坐标范围（单位米）。
-   *
-   * 海关的数值取自 tarkov.dev 的开源地图元数据（bounds: [[698, -307], [-372, 237]]），
-   * 用于校验标定时输入的坐标是否落在本图范围内——填错图或填错数是最常见的错误来源。
-   */
-  bounds: {
-    minX: number;
-    maxX: number;
-    minZ: number;
-    maxZ: number;
-  };
+  /** 素材在渲染时已经按该角度旋正，这里保留原值仅作记录 */
+  rotation: number;
+  /** 本图覆盖的世界坐标范围（米） */
+  bounds: MapBounds;
   source: {
     name: string;
     license: string;
-    url?: string;
+    url?: string | undefined;
+  };
+  attribution: {
+    author: string;
+    authorLink: string;
+    svgPath: string;
   };
 };
 
@@ -35,30 +41,33 @@ function assetUrl(path: string): string {
 }
 
 /**
- * 地图清单。
- *
- * 原始素材（9248×5399 PNG）不入库，这里放的是缩放到 4608 宽的无损 WebP，
- * 换算成世界坐标后约 0.2 米/像素，足够精确打点。
+ * 地图清单：素材由 tools/build-maps.mjs 从 tarkov.dev 的开源数据生成
+ * （MIT 许可，矢量图作者见各图 attribution.author）。
  */
-export const MAPS: readonly MapAsset[] = [
-  {
-    id: "customs",
-    name: "海关",
-    imageUrl: assetUrl("maps/customs.webp"),
-    width: 4608,
-    height: 2691,
-    bounds: { minX: -372, maxX: 698, minZ: -307, maxZ: 237 },
-    source: {
-      name: "玩家提供的社区地图",
-      license: "待确认（见 docs/MAP_COORDINATES.md 资源清单）",
-    },
+export const MAPS: readonly MapAsset[] = GENERATED_MAPS.map((map) => ({
+  id: map.id,
+  name: map.name,
+  imageUrl: assetUrl(`maps/${map.id}.webp`),
+  width: map.width,
+  height: map.height,
+  rotation: map.rotation,
+  bounds: map.bounds,
+  source: {
+    name: `tarkov.dev 矢量地图（作者 ${map.attribution.author}）`,
+    license: "MIT",
+    url: map.attribution.authorLink,
   },
-];
+  attribution: map.attribution,
+}));
 
 export const DEFAULT_MAP_ID = "customs";
 
+export function findMapOrNull(mapId: string): MapAsset | null {
+  return MAPS.find((item) => item.id === mapId) ?? null;
+}
+
 export function findMap(mapId: string): MapAsset {
-  const map = MAPS.find((item) => item.id === mapId);
-  if (map === undefined) throw new Error(`未知地图：${mapId}`);
+  const map = findMapOrNull(mapId);
+  if (map === null) throw new Error(`未知地图：${mapId}`);
   return map;
 }

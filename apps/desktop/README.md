@@ -22,10 +22,11 @@ apps/desktop/
 │   ├── preload/index.ts            # 白名单 IPC 桥
 │   ├── shared/ipc.ts               # 主进程 ↔ 渲染进程的类型契约
 │   └── renderer/
-│       ├── public/maps/customs.webp  # 地图素材（4608px 无损 WebP）
+│       ├── public/maps/*.webp      # 10 张地图素材（由 tools/build-maps.mjs 生成）
 │       └── src/
 │           ├── components/         # MapCanvas / Toolbar / Sidebar / CalibrationPanel
 │           ├── calibration.ts      # 标定草稿 → 单应矩阵（纯函数）
+│           ├── maps.generated.ts   # 构建脚本生成的地图元数据（勿手改）
 │           ├── maps.ts             # 地图清单与资源路径解析
 │           ├── store.ts            # Zustand 状态
 │           └── format.ts           # 位置与新鲜度文案
@@ -56,10 +57,24 @@ TMS_SCREENSHOT_DIR=/path/to/screenshots npm run dev:desktop
 
 ## 使用流程
 
-1. **标定地图**（每张图一次）：点工具栏"标定" → 在地图上点 4 个认得出的地标 → 每个点填入它的
-   世界坐标（站在地标上按一次截图键，回来点"用截图"即可自动填入）→ "计算并保存"。
-2. **看自己的位置**：进游戏后按截图键，位置与朝向会自动出现在地图上，侧栏显示"N 秒前"。
-3. **打点**：选好标记类型后在图上点一下；"选择"模式下点标记可选中、重命名、删除。
+1. **选地图**：工具栏左上角切换（共 10 张）。首次打开某张图会**自动套用预置标定**——
+   它按 tarkov.dev 的地图元数据算出，标定面板会标明"预置标定（未核对）"。
+2. **核对标定**：进游戏按一次截图，看点位是否落在你实际站的位置。方向正好相反就点
+   「翻转 180°」，确认无误后点「计算并保存」存到本机。想自己重标也可以：图上点 4 个地标 →
+   填世界坐标（站上去按截图，回来点"用截图"自动填）。
+3. **看自己的位置**：进游戏后按截图键，位置与朝向会自动出现在地图上，侧栏显示"N 秒前"。
+4. **打点**：选好标记类型后在图上点一下；"选择"模式下点标记可选中、重命名、删除。
+
+## 地图素材
+
+素材不在仓库里手工维护，而是由脚本生成：
+
+```bash
+node tools/build-maps.mjs     # 下载 tarkov.dev 的 SVG → Chromium 渲染 → WebP → 生成元数据
+```
+
+脚本写入 `src/renderer/public/maps/*.webp` 与 `src/renderer/src/maps.generated.ts`，
+下载缓存放在 `tools/.cache/`（已 gitignore）。
 
 ## 关键约束
 

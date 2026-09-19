@@ -49,6 +49,33 @@ describe("solveHomography", () => {
     expect(reprojectionError(solved, controlPoints)).toBeLessThan(0.01);
   });
 
+  it("控制点质心远离原点时依然精确（回归：归一化漏减 Z 中心）", () => {
+    // 这批点的 z 质心是 700，而不是 0——只减一个轴的中心会让结果整体错位
+    const offsetWorld = [
+      { x: -320, z: 940 },
+      { x: 280, z: 900 },
+      { x: 250, z: 470 },
+      { x: -290, z: 490 },
+    ];
+    const controlPoints = makeControlPoints(TRUE_HOMOGRAPHY, offsetWorld);
+    const solved = solveHomography(controlPoints);
+
+    expect(reprojectionError(solved, controlPoints)).toBeLessThan(0.01);
+  });
+
+  it("世界坐标与像素坐标的质心都偏移时也能精确求解", () => {
+    const mergedWorld = [
+      { x: 620, z: 1180 },
+      { x: 1210, z: 1140 },
+      { x: 1190, z: 720 },
+      { x: 650, z: 740 },
+    ];
+    const controlPoints = makeControlPoints(TRUE_HOMOGRAPHY, mergedWorld);
+    const solved = solveHomography(controlPoints);
+
+    expect(reprojectionError(solved, controlPoints)).toBeLessThan(0.01);
+  });
+
   it("额外验证点误差不超过 2 像素", () => {
     const controlPoints = makeControlPoints(TRUE_HOMOGRAPHY, WORLD_POINTS);
     const solved = solveHomography(controlPoints);

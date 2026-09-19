@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { _electron as electron, expect, test } from "@playwright/test";
 
 /**
@@ -6,7 +10,9 @@ import { _electron as electron, expect, test } from "@playwright/test";
  * 运行前需要先构建：`npm run build -w @tarkov-map-share/desktop`。
  */
 test("启动后渲染出地图画布并画出地图内容", async () => {
-  const app = await electron.launch({ args: ["."] });
+  // 独立的 userData 目录，避免读到上一轮测试留下的标定
+  const userData = await mkdtemp(join(tmpdir(), "tms-e2e-userdata-"));
+  const app = await electron.launch({ args: [".", `--user-data-dir=${userData}`] });
   try {
     const window = await app.firstWindow();
     await expect(window).toHaveTitle("塔科夫地图共享");
@@ -16,8 +22,13 @@ test("启动后渲染出地图画布并画出地图内容", async () => {
     await expect(window.getByRole("heading", { name: "截图目录" })).toBeVisible();
     await expect(window.getByRole("heading", { name: "地图标定" })).toBeVisible();
 
-    // 未标定时应提示先做标定
-    await expect(window.getByText(/地图还没有标定/)).toBeVisible();
+    // 首次启动会应用地图元数据生成的预置标定，并明确标注"未核对"
+    await expect(window.getByText(/预置标定（未核对）/)).toBeVisible();
+    await expect(window.getByText(/还没有核对过/)).toBeVisible();
+
+    // 地图选择器包含全部地图
+    await expect(window.getByLabel("选择地图")).toBeVisible();
+    await expect(window.getByLabel("选择地图").locator("option")).toHaveCount(10);
 
     const canvas = window.locator("canvas");
     await expect(canvas).toBeVisible();
@@ -39,5 +50,6 @@ test("启动后渲染出地图画布并画出地图内容", async () => {
       .toBeGreaterThan(0);
   } finally {
     await app.close();
+    await rm(userData, { recursive: true, force: true });
   }
 });

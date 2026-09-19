@@ -173,6 +173,28 @@ body {
   font-size: 13px;
 }
 
+.select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.panel__notice {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--warn) 10%, transparent);
+}
+
+.panel__notice .panel__hint {
+  margin-bottom: 6px;
+}
+
 /* ---------- 地图画布 ---------- */
 
 .map-canvas {
