@@ -375,7 +375,9 @@ export const useMapStore = create<MapStore>((set, get) => ({
       }
     }
 
-    // 没有本机标定时使用元数据预置值，用户按一次截图即可核对
-    get().applyPresetCalibration(mapId);
+    // 没有本机标定时**不**自动套用预置值：
+    // 预置值按地图元数据推算，实测与素材的实际覆盖范围不一致（见 docs/MAP_COORDINATES.md 8.2），
+    // 静默套用会让用户以为"点位就是对的"。改为在标定面板里提供"试用预置标定"按钮。
+    get().setCalibration(null);
   },
 }));

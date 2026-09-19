@@ -30,6 +30,11 @@ test("截图目录里出现新文件后，界面上能看到坐标", async () =>
     await writeFile(join(directory, SAMPLE), "png");
 
     // 轮询间隔 1 秒，给足余量
+    // 先用"试用预置标定"把地图标起来（这正是新用户会走的路径），
+    // 否则没有映射关系，位置只能显示在侧栏、画不到图上
+    await window.getByRole("button", { name: "试用预置标定" }).click();
+    await expect(window.getByText(/已套用预置标定/)).toBeVisible();
+
     // 等地图画出来，再记录整块画布的指纹，稍后确认"点真的画上去了"
     await expect.poll(async () => await canvasSignature(window), { timeout: 10_000 }).toBeGreaterThan(0);
     const canvasBefore = await canvasSignature(window);

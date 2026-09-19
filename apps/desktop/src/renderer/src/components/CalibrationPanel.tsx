@@ -56,6 +56,14 @@ export function CalibrationPanel() {
     });
   };
 
+  const tryPreset = (): void => {
+    useMapStore.getState().applyPresetCalibration(mapId);
+    setMessage({
+      ok: true,
+      text: "已套用预置标定：按一次截图核对。预置值由地图元数据推算，可能会整体偏移或方向相反。",
+    });
+  };
+
   return (
     <section className="panel">
       <header className="panel__head">
@@ -70,12 +78,23 @@ export function CalibrationPanel() {
       {calibrationSource === "preset" ? (
         <div className="panel__notice">
           <p className="panel__hint">
-            这是根据 tarkov.dev 地图元数据<strong>预置</strong>的标定，还没有核对过。
-            按一次截图看点位对不对；如果方向正好相反，点「翻转 180°」，确认无误后点「计算并保存」存到本机。
+            这是根据 tarkov.dev 地图元数据<strong>预置</strong>的标定，<strong>没有经过核对</strong>——
+            实测它可能整体偏移或方向相反。按一次截图看点位；如果方向相反，点「翻转 180°」，
+            确认无误后点「计算并保存」存到本机。
           </p>
           <div className="panel__actions">
             <button type="button" className="btn" onClick={flip180}>
               翻转 180°
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => {
+                useMapStore.getState().setCalibration(null);
+                setMessage({ ok: true, text: "已取消预置标定" });
+              }}
+            >
+              取消预置
             </button>
           </div>
         </div>
@@ -84,12 +103,18 @@ export function CalibrationPanel() {
       {mode !== "calibrate" ? (
         <>
           <p className="panel__hint">
-            标定一次即可长期使用：找 4 个认得出的地标，站在上面按截图键，回到这里点选位置并填入坐标。
+            标定一次即可长期使用：找 4 个认得出的地标，在图上点选位置并填入它的世界坐标
+            （站在地标上按一次截图键，回来点"用截图"就能自动填）。坐标要分散，别挤在一角。
           </p>
           <div className="panel__actions">
             <button type="button" className="btn btn--primary" onClick={startCalibration}>
               {calibration === null ? "开始标定" : "重新标定"}
             </button>
+            {calibration === null ? (
+              <button type="button" className="btn" onClick={tryPreset}>
+                试用预置标定
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn"

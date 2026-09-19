@@ -54,7 +54,9 @@ export const MAPS: readonly MapAsset[] = GENERATED_MAPS.map((map) => ({
   bounds: map.bounds,
   source: {
     name: `tarkov.dev 矢量地图（作者 ${map.attribution.author}）`,
-    license: "MIT",
+    // 注意：矢量图来自 the-hideout/tarkov-dev-svg-maps，许可是 CC BY-NC-SA 4.0（非商用、相同方式共享），
+    // 不是 tarkov-dev 代码仓库的 MIT。详见 docs/MAP_COORDINATES.md 第 8 节。
+    license: "CC BY-NC-SA 4.0",
     url: map.attribution.authorLink,
   },
   attribution: map.attribution,

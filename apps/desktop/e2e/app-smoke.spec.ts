@@ -22,9 +22,9 @@ test("启动后渲染出地图画布并画出地图内容", async () => {
     await expect(window.getByRole("heading", { name: "截图目录" })).toBeVisible();
     await expect(window.getByRole("heading", { name: "地图标定" })).toBeVisible();
 
-    // 首次启动会应用地图元数据生成的预置标定，并明确标注"未核对"
-    await expect(window.getByText(/预置标定（未核对）/)).toBeVisible();
-    await expect(window.getByText(/还没有核对过/)).toBeVisible();
+    // 默认不套用未经核实的预置标定，而是提示先标定，并提供"试用预置标定"入口
+    await expect(window.getByText(/地图还没有标定/)).toBeVisible();
+    await expect(window.getByRole("button", { name: "试用预置标定" })).toBeVisible();
 
     // 地图选择器包含全部地图
     await expect(window.getByLabel("选择地图")).toBeVisible();
