@@ -39,9 +39,27 @@ apps/desktop/
 ```bash
 npm run dev:desktop                                      # 仓库根目录：开发模式（热更新）
 npm run build --workspace @tarkov-map-share/desktop      # 构建到 apps/desktop/out
+npm run build:win --workspace @tarkov-map-share/desktop   # 打 Windows 安装包 + 便携 zip
+npm run build:mac --workspace @tarkov-map-share/desktop   # 打 macOS zip
 npm test --workspace @tarkov-map-share/desktop           # 单元测试
 npm run test:e2e --workspace @tarkov-map-share/desktop   # 端到端（需先 build）
 ```
+
+打包产物在 `apps/desktop/release/`：
+
+* `tarkov-map-share Setup 0.0.0.exe` —— Windows 安装包，发给朋友装这个
+* `tarkov-map-share-0.0.0-win.zip` —— 免安装版，解压后直接跑 exe
+* macOS 产物只有 zip（未签名，本机自用没问题）
+
+打包前的注意事项：
+
+* `tools/prepare-package.mjs` 会把 `ws` 复制到应用自己的 `node_modules`——
+  npm workspaces 会把它提升到仓库根目录，不复制的话打包产物会缺依赖
+* 不要把 `ws` 打进主进程产物：实测 rollup 改写后会让主进程在启动服务端后卡死
+* 国内网络需要镜像：
+  `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ npm run build:win`
+* 在 macOS 上打 Windows 包会跳过 exe 资源编辑（没有 wine），因此 exe 用默认 Electron 图标；
+  想带上图标与版本信息，在 Windows 上跑同一条命令即可
 
 首次安装如果卡在 Electron 二进制下载（国内网络常见），用镜像：
 

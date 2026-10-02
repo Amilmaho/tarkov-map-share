@@ -14,15 +14,21 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite";
  * 必须打包进产物，所以要从外部化列表里排除。
  */
 
-/** 这两个是纯 TS 源码包，必须打包进产物；其余依赖保持外部引用 */
-const WORKSPACE_PACKAGES = ["@tarkov-map-share/shared", "@tarkov-map-share/server"];
+/**
+ * 必须打包进产物的依赖：这两个是纯 TS 源码包，Node 不能直接 require。
+ *
+ * 注意：不要把 `ws` 也打包进来——实测它在 rollup 里会被改写，
+ * 结果是主进程启动服务端后整个卡死（IPC 与页面都无响应）。
+ * `ws` 保持外部引用，打包时由 tools/prepare-package.mjs 复制到应用自己的 node_modules。
+ */
+const BUNDLED_DEPENDENCIES = ["@tarkov-map-share/shared", "@tarkov-map-share/server"];
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: WORKSPACE_PACKAGES })],
+    plugins: [externalizeDepsPlugin({ exclude: BUNDLED_DEPENDENCIES })],
   },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: WORKSPACE_PACKAGES })],
+    plugins: [externalizeDepsPlugin({ exclude: BUNDLED_DEPENDENCIES })],
   },
   renderer: {
     plugins: [react()],

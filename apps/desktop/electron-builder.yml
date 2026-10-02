@@ -1,0 +1,47 @@
+# 打包配置：产出可直接发给朋友的桌面端
+#
+# - Windows 目标在 macOS 上也能构建：signAndEditExecutable: false 可以跳过
+#   需要 wine 的 exe 资源编辑（代价是 exe 用默认图标、没有版本信息）
+# - 依赖不写进 files：只有 out/ 与生产依赖会被打包，
+#   ws 由 tools/prepare-package.mjs 复制到应用自己的 node_modules
+
+appId: com.amilmaho.tarkov-map-share
+productName: tarkov-map-share
+copyright: "仅供自用与学习"
+# 显式指定版本：electron 装在仓库根目录（npm workspaces 提升），
+# electron-builder 在应用目录里找不到它，只能靠这里确定版本
+electronVersion: 33.4.11
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+  - "!**/*.map"
+
+win:
+  target:
+    - target: zip
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+  # macOS 上没有 wine，跳过 exe 资源编辑才能出包
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: 塔科夫地图共享
+
+mac:
+  target:
+    - target: zip
+      arch: [arm64]
+  category: public.app-category.utilities
+  identity: null
+
+publish: null
