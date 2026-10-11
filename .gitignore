@@ -35,6 +35,8 @@ image/
 tools/.cache/
 # electron-builder 的打包产物
 apps/desktop/release/
+# 打包产物里只有 Windows 会发出去，macOS 产物不必保留
+apps/desktop/release/*-mac.zip
 
 # 系统与编辑器
 .DS_Store

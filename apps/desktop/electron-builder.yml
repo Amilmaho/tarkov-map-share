@@ -38,6 +38,9 @@ nsis:
   createDesktopShortcut: true
   shortcutName: 塔科夫地图共享
 
+# 只发布 Windows：没人用 macOS 玩塔科夫。
+# 这里的 mac 配置仅用于"在 macOS 上验证打包产物能跑"（e2e/packaged.spec.ts），
+# 不对外分发；不想验证时可以直接删掉这一节。
 mac:
   icon: build/icon.png
   target:

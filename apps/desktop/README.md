@@ -40,7 +40,7 @@ apps/desktop/
 npm run dev:desktop                                      # 仓库根目录：开发模式（热更新）
 npm run build --workspace @tarkov-map-share/desktop      # 构建到 apps/desktop/out
 npm run build:win --workspace @tarkov-map-share/desktop   # 打 Windows 安装包 + 便携 zip
-npm run build:mac --workspace @tarkov-map-share/desktop   # 打 macOS zip
+npm run build:mac --workspace @tarkov-map-share/desktop   # 仅用于本机验证打包产物，不对外分发
 npm test --workspace @tarkov-map-share/desktop           # 单元测试
 npm run test:e2e --workspace @tarkov-map-share/desktop   # 端到端（需先 build）
 ```
@@ -49,7 +49,10 @@ npm run test:e2e --workspace @tarkov-map-share/desktop   # 端到端（需先 bu
 
 * `tarkov-map-share Setup <版本>.exe` —— Windows 安装包，发给朋友装这个
 * `tarkov-map-share-<版本>-win.zip` —— 免安装版，解压后直接跑 exe
-* macOS 产物只有 zip（未签名，本机自用没问题）
+
+**只发布 Windows**：塔科夫跑在 Windows 上，macOS 版没有任何使用场景。
+`build:mac` 保留只是为了在开发机上验证"打包产物真的能跑"（`e2e/packaged.spec.ts`），
+产物不用发给任何人。
 
 应用图标在 `build/icon.svg`，用 `node tools/build-icon.mjs` 重新生成
 `build/icon.png`（1024，macOS 与通用）与 `build/icon.ico`（6 个尺寸，Windows）
