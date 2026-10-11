@@ -22,6 +22,7 @@ files:
   - "!**/*.map"
 
 win:
+  icon: build/icon.ico
   target:
     - target: zip
       arch: [x64]
@@ -38,6 +39,7 @@ nsis:
   shortcutName: 塔科夫地图共享
 
 mac:
+  icon: build/icon.png
   target:
     - target: zip
       arch: [arm64]

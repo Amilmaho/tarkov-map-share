@@ -189,10 +189,11 @@ describe("presetCalibration", () => {
   it("把世界包围盒的四角对应到图片四角", () => {
     expect(preset.controlPoints).toHaveLength(4);
     expect(preset.controlPoints[0]?.world).toEqual({ x: -372, z: -307 });
-    expect(preset.controlPoints[0]?.image).toEqual({ px: 0, py: 0 });
-    expect(preset.controlPoints[1]?.image).toEqual({ px: 4096, py: 0 });
-    expect(preset.controlPoints[2]?.image).toEqual({ px: 4096, py: 2082 });
-    expect(preset.controlPoints[3]?.image).toEqual({ px: 0, py: 2082 });
+    // 素材已旋正为北朝上：世界坐标 Z 越小越靠上，所以四个角是上下翻转的关系
+    expect(preset.controlPoints[0]?.image).toEqual({ px: 4096, py: 2082 });
+    expect(preset.controlPoints[1]?.image).toEqual({ px: 0, py: 2082 });
+    expect(preset.controlPoints[2]?.image).toEqual({ px: 0, py: 0 });
+    expect(preset.controlPoints[3]?.image).toEqual({ px: 4096, py: 0 });
   });
 
   it("可以直接解出接近零误差的单应矩阵", () => {
@@ -223,8 +224,8 @@ describe("rotateCalibration180", () => {
   it("图片坐标绕中心旋转，世界坐标保持不变", () => {
     const flipped = rotateCalibration180(preset);
 
-    expect(flipped.controlPoints[0]?.image).toEqual({ px: 4096, py: 2082 });
-    expect(flipped.controlPoints[2]?.image).toEqual({ px: 0, py: 0 });
+    expect(flipped.controlPoints[0]?.image).toEqual({ px: 0, py: 0 });
+    expect(flipped.controlPoints[2]?.image).toEqual({ px: 4096, py: 2082 });
     expect(flipped.controlPoints[0]?.world).toEqual({ x: -372, z: -307 });
   });
 

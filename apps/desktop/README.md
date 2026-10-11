@@ -47,9 +47,13 @@ npm run test:e2e --workspace @tarkov-map-share/desktop   # 端到端（需先 bu
 
 打包产物在 `apps/desktop/release/`：
 
-* `tarkov-map-share Setup 0.0.0.exe` —— Windows 安装包，发给朋友装这个
-* `tarkov-map-share-0.0.0-win.zip` —— 免安装版，解压后直接跑 exe
+* `tarkov-map-share Setup <版本>.exe` —— Windows 安装包，发给朋友装这个
+* `tarkov-map-share-<版本>-win.zip` —— 免安装版，解压后直接跑 exe
 * macOS 产物只有 zip（未签名，本机自用没问题）
+
+应用图标在 `build/icon.svg`，用 `node tools/build-icon.mjs` 重新生成
+`build/icon.png`（1024，macOS 与通用）与 `build/icon.ico`（6 个尺寸，Windows）
+以及运行时用的 `src/renderer/public/icon.png`。
 
 打包前的注意事项：
 

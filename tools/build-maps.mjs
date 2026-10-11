@@ -106,7 +106,9 @@ async function main() {
     const worldWidth = maxX - minX;
     const worldHeight = maxZ - minZ;
 
-    const rotation = entry.coordinateRotation ?? 0;
+    // 上游矢量图的朝向与玩家习惯相反：直接渲染出来是"北在下"。
+    // 统一再转 180°，让所有地图都是北朝上（coordinateRotation 描述的是素材自身的朝向差）。
+    const rotation = ((entry.coordinateRotation ?? 0) + 180) % 360;
     // 旋转 90/270 时，输出图的宽高要交换，才能让画面比例吻合世界包围盒
     const swapAxes = rotation % 180 !== 0;
     const aspect = worldWidth / worldHeight;

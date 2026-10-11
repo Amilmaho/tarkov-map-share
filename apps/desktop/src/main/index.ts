@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { BrowserWindow, app, dialog, ipcMain, shell } from "electron";
+import { BrowserWindow, Menu, app, dialog, ipcMain, shell } from "electron";
 
 import type { Calibration } from "@tarkov-map-share/shared";
 
@@ -45,6 +45,8 @@ async function createWindow(): Promise<void> {
     show: false,
     backgroundColor: "#0d0f13",
     title: "塔科夫地图共享",
+    // 运行时窗口/任务栏图标（exe 自身的图标由打包工具处理）
+    icon: join(__dirname, "../renderer/icon.png"),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       // 安全基线：渲染进程拿不到 Node，只能通过白名单 IPC 通信
@@ -152,6 +154,11 @@ function registerIpcHandlers(): void {
 }
 
 void app.whenReady().then(async () => {
+  // 隐藏 Windows/Linux 上的默认菜单栏（File/Edit/View…）：
+  // 这是应用而不是浏览器，菜单只会让人分心。
+  // macOS 的菜单在系统顶栏、同时也是快捷键（Cmd+C 等）的来源，所以保留。
+  if (process.platform !== "darwin") Menu.setApplicationMenu(null);
+
   registerIpcHandlers();
   await createWindow();
   await watcher.scan();

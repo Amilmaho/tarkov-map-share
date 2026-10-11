@@ -210,10 +210,11 @@ export function presetCalibration(input: {
     image: input.image,
     rotation: 0,
     controlPoints: [
-      { world: { x: minX, z: minZ }, image: { px: 0, py: 0 }, label: "角 1" },
-      { world: { x: maxX, z: minZ }, image: { px: width, py: 0 }, label: "角 2" },
-      { world: { x: maxX, z: maxZ }, image: { px: width, py: height }, label: "角 3" },
-      { world: { x: minX, z: maxZ }, image: { px: 0, py: height }, label: "角 4" },
+      // 地图素材已统一旋正为"北朝上"，因此世界坐标 Z 越小越靠上
+      { world: { x: minX, z: minZ }, image: { px: width, py: height }, label: "角 1" },
+      { world: { x: maxX, z: minZ }, image: { px: 0, py: height }, label: "角 2" },
+      { world: { x: maxX, z: maxZ }, image: { px: 0, py: 0 }, label: "角 3" },
+      { world: { x: minX, z: maxZ }, image: { px: width, py: 0 }, label: "角 4" },
     ],
     source: input.source,
   };
