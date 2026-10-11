@@ -47,7 +47,7 @@ npm run test:e2e --workspace @tarkov-map-share/desktop   # 端到端（需先 bu
 
 打包产物在 `apps/desktop/release/`：
 
-* `tarkov-map-share Setup <版本>.exe` —— Windows 安装包，发给朋友装这个
+* `tarkov-map-share-<版本>.exe` —— Windows 安装包，发给朋友装这个
 * `tarkov-map-share-<版本>-win.zip` —— 免安装版，解压后直接跑 exe
 
 **只发布 Windows**：塔科夫跑在 Windows 上，macOS 版没有任何使用场景。

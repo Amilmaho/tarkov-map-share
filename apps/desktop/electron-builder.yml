@@ -32,6 +32,8 @@ win:
   signAndEditExecutable: false
 
 nsis:
+  # 安装包文件名不带空格，方便上传和转发
+  artifactName: "tarkov-map-share-${version}.${ext}"
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
