@@ -56,6 +56,7 @@ const marker = {
   id: MARKER_ID,
   roomId: ROOM,
   mapId: "customs",
+  floorId: null,
   kind: "loot",
   position,
   label: "保险箱",
@@ -92,7 +93,7 @@ const clientMessages = [
   {
     ...envelope,
     type: "marker.create",
-    payload: { marker: { id: MARKER_ID, mapId: "customs", kind: "loot", position, label: "保险箱" } },
+    payload: { marker: { id: MARKER_ID, mapId: "customs", floorId: "ground", kind: "loot", position, label: "保险箱" } },
   },
   { ...envelope, type: "marker.update", payload: { markerId: MARKER_ID, patch: { label: "已开" } } },
   { ...envelope, type: "marker.delete", payload: { markerId: MARKER_ID } },

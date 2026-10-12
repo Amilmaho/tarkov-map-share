@@ -7,7 +7,7 @@ import {
   worldToScreen,
 } from "@tarkov-map-share/shared";
 
-import { findMap } from "../maps";
+import { findFloor, findMap } from "../maps";
 import { MARKER_KIND_COLORS, useMapStore } from "../store";
 
 const MARKER_RADIUS = 7;
@@ -115,6 +115,7 @@ export function MapCanvas() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const mapId = useMapStore((state) => state.mapId);
+  const floorId = useMapStore((state) => state.floorId);
   const viewport = useMapStore((state) => state.viewport);
   const canvasSize = useMapStore((state) => state.canvasSize);
   const fitted = useMapStore((state) => state.fitted);
@@ -127,6 +128,9 @@ export function MapCanvas() {
   const draftPoints = useMapStore((state) => state.draftPoints);
 
   const map = findMap(mapId);
+  const floor = findFloor(map, floorId);
+  /** 老标记可能没有楼层（floorId 为 null），按地面层处理 */
+  const defaultFloorId = map.floors[0]?.id ?? "ground";
   viewportRef.current = viewport;
 
   // 地图图片只加载一次
@@ -142,13 +146,13 @@ export function MapCanvas() {
       setImageReady(false);
       setLoadError("地图图片加载失败");
     };
-    image.src = map.imageUrl;
+    image.src = floor.imageUrl;
 
     return () => {
       image.onload = null;
       image.onerror = null;
     };
-  }, [map.imageUrl]);
+  }, [floor.imageUrl]);
 
   // 容器尺寸变化 → 更新画布尺寸
   useEffect(() => {
@@ -209,6 +213,8 @@ export function MapCanvas() {
 
     if (homography !== null) {
       for (const marker of markers) {
+        // 只画当前楼层的标记，避免楼上楼下的点混在一起
+        if ((marker.floorId ?? defaultFloorId) !== floor.id) continue;
         drawMarker(
           ctx,
           worldToScreen(viewport, homography, marker.position),
@@ -232,7 +238,19 @@ export function MapCanvas() {
         );
       }
     }
-  }, [canvasSize, viewport, markers, selectedMarkerId, self, homography, draftPoints, map, imageReady]);
+  }, [
+    canvasSize,
+    viewport,
+    markers,
+    selectedMarkerId,
+    self,
+    homography,
+    draftPoints,
+    map,
+    floor,
+    defaultFloorId,
+    imageReady,
+  ]);
 
   // 滚轮缩放需要非被动监听，才能在滚动时阻止页面滚动
   useEffect(() => {

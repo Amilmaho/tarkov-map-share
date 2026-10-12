@@ -18,6 +18,8 @@ export const MarkerSchema = z.object({
   id: MarkerIdSchema,
   roomId: RoomCodeSchema,
   mapId: MapIdSchema,
+  /** 所在楼层（多楼层地图用），null 表示未指定 */
+  floorId: z.string().min(1).max(32).nullable(),
   kind: MarkerKindSchema,
   position: WorldPositionSchema,
   label: LabelSchema,
@@ -35,6 +37,7 @@ export const MarkerSchema = z.object({
 export const MarkerDraftSchema = z.object({
   id: MarkerIdSchema,
   mapId: MapIdSchema,
+  floorId: z.string().min(1).max(32).nullable().optional(),
   kind: MarkerKindSchema,
   position: WorldPositionSchema,
   label: LabelSchema,

@@ -18,6 +18,8 @@ export type MapAsset = {
   rotation: number;
   /** 本图覆盖的世界坐标范围（米） */
   bounds: MapBounds;
+  /** 楼层（多楼层地图）。第一项是地面层，也是默认层 */
+  floors: readonly { id: string; name: string; imageUrl: string }[];
   source: {
     name: string;
     license: string;
@@ -52,6 +54,12 @@ export const MAPS: readonly MapAsset[] = GENERATED_MAPS.map((map) => ({
   height: map.height,
   rotation: map.rotation,
   bounds: map.bounds,
+  floors: map.floors.map((floor) => ({
+    id: floor.id,
+    name: floor.name,
+    // 地面层的文件名与地图同名，其余带楼层后缀
+    imageUrl: assetUrl(`maps/${floor.file}`),
+  })),
   source: {
     name: `tarkov.dev 矢量地图（作者 ${map.attribution.author}）`,
     // 注意：矢量图来自 the-hideout/tarkov-dev-svg-maps，许可是 CC BY-NC-SA 4.0（非商用、相同方式共享），
@@ -66,6 +74,16 @@ export const DEFAULT_MAP_ID = "customs";
 
 export function findMapOrNull(mapId: string): MapAsset | null {
   return MAPS.find((item) => item.id === mapId) ?? null;
+}
+
+/** 取某张图的某个楼层；找不到就退回第一层（地面） */
+export function findFloor(map: MapAsset, floorId: string): { id: string; name: string; imageUrl: string } {
+  const matched = map.floors.find((floor) => floor.id === floorId);
+  if (matched !== undefined) return matched;
+
+  const first = map.floors[0];
+  if (first === undefined) throw new Error(`地图 ${map.id} 没有楼层数据`);
+  return first;
 }
 
 export function findMap(mapId: string): MapAsset {

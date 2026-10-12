@@ -38,6 +38,9 @@ test("打包产物能启动并创建房间", async () => {
     await expect(window.locator("canvas")).toBeVisible();
     await expect(window.getByRole("heading", { name: "联机" })).toBeVisible();
 
+    // 多楼层素材也打进了产物
+    await expect(window.getByRole("group", { name: "楼层" })).toBeVisible();
+
     // 内嵌服务端能在打包环境里跑起来
     await window.getByLabel("昵称").fill("阿飞");
     await window.getByRole("button", { name: "创建房间（我是主机）" }).click();

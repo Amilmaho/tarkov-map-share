@@ -22,7 +22,7 @@
 
 ## 版本
 
-当前版本 **0.0.2**，变更见 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
+当前版本 **0.0.3**，变更见 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
 打包产物在 `apps/desktop/release/`（Windows 安装包 / 免安装 zip / macOS zip）。
 | 地图标记（点位、文字、图标） | 计划中 |
 | 路线绘制与共享 | 计划中 |

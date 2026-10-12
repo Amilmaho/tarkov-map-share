@@ -9,6 +9,8 @@ export function Toolbar() {
   const mapId = useMapStore((state) => state.mapId);
   const mode = useMapStore((state) => state.mode);
   const markerKind = useMapStore((state) => state.markerKind);
+  const floorId = useMapStore((state) => state.floorId);
+  const setFloor = useMapStore((state) => state.setFloor);
   const viewport = useMapStore((state) => state.viewport);
   const homography = useMapStore((state) => state.homography);
 
@@ -39,6 +41,22 @@ export function Toolbar() {
           {homography !== null ? "已标定" : "未标定"}
         </span>
       </div>
+
+      {map.floors.length > 1 ? (
+        <div className="toolbar__group" role="group" aria-label="楼层">
+          {map.floors.map((floor) => (
+            <button
+              key={floor.id}
+              type="button"
+              className="btn"
+              aria-pressed={floorId === floor.id}
+              onClick={() => setFloor(floor.id)}
+            >
+              {floor.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="toolbar__group" role="group" aria-label="操作模式">
         <button

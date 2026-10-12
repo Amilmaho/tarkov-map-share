@@ -196,7 +196,9 @@ export function RoomPanel() {
               </span>
               {position !== undefined ? (
                 <>
-                  <span className="member-row__coords">{formatPosition(position.x, position.z)}</span>
+                  <span className="member-row__coords" title={`高度 ${position.y.toFixed(1)} 米`}>
+                    {formatPosition(position.x, position.z)}
+                  </span>
                   <span className={`badge badge--${freshness.level}`}>{freshness.label}</span>
                   <button
                     type="button"

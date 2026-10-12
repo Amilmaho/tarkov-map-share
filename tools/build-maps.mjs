@@ -47,6 +47,23 @@ const MAP_NAMES = {
   "terminal": "终点站",
 };
 
+/**
+ * 楼层图层：id 是 SVG 里的分组名，name 是界面显示名，slug 用于文件名。
+ * 顺序即界面上的顺序（地面在前，往上/往下依次排列）。
+ */
+const FLOOR_LAYERS = [
+  { id: "Ground_Level", name: "地面", slug: "ground", ground: true },
+  { id: "Ground_Floor", name: "地面", slug: "ground", ground: true },
+  { id: "First_Floor", name: "1 层", slug: "f1" },
+  { id: "Second_Floor", name: "2 层", slug: "f2" },
+  { id: "Third_Floor", name: "3 层", slug: "f3" },
+  { id: "Fourth_Floor", name: "4 层", slug: "f4" },
+  { id: "Fifth_Floor", name: "5 层", slug: "f5" },
+  { id: "Basement", name: "地下室", slug: "basement" },
+  { id: "Underground_Level", name: "地下", slug: "underground" },
+  { id: "Bunkers", name: "掩体", slug: "bunkers" },
+];
+
 async function download(url, target) {
   if (existsSync(target)) return await readFile(target);
   const response = await fetch(url);
@@ -115,15 +132,41 @@ async function main() {
     const width = aspect >= 1 || swapAxes ? TARGET_LONG_SIDE : Math.round(TARGET_LONG_SIDE * aspect);
     const height = aspect >= 1 || swapAxes ? Math.round(TARGET_LONG_SIDE / aspect) : TARGET_LONG_SIDE;
 
+    // 这张图的 SVG 里有哪些楼层分组
+    const svgText = svgBuffer.toString("utf8");
+    const availableFloors = FLOOR_LAYERS.filter((floor) => svgText.includes(`id="${floor.id}"`));
+    const groundLayer = availableFloors.find((floor) => floor.ground === true);
+
+    /** 每张输出图：id / 显示名 / 输出文件（webp 名） */
+    const floors =
+      availableFloors.length === 0
+        ? [{ id: "default", name: "地图", file: `${entry.key}.webp` }]
+        : availableFloors.map((floor) => ({
+            id: floor.slug,
+            name: floor.name,
+            file: floor.ground === true ? `${entry.key}.webp` : `${entry.key}__${floor.slug}.webp`,
+          }));
+
     const pngPath = join(PNG_DIR, `${entry.key}.png`);
-    jobs.push({
+    const job = {
       key: entry.key,
       svgBase64: svgBuffer.toString("base64"),
       width,
       height,
       rotation,
       pngPath,
-    });
+    };
+
+    if (availableFloors.length > 0) {
+      job.floors = availableFloors.map((floor) => ({
+        key: floor.ground === true ? "base" : floor.slug,
+        visible: floor.id,
+        // 站在楼上时把地面压暗当底图；地面层自己不需要
+        ...(floor.ground === true || groundLayer === undefined ? {} : { dimmed: groundLayer.id }),
+        pngPath: floor.ground === true ? pngPath : join(PNG_DIR, `${entry.key}__${floor.slug}.png`),
+      }));
+    }
+    jobs.push(job);
 
     metadata.push({
       key: entry.key,
@@ -136,6 +179,7 @@ async function main() {
       author: entry.author ?? "",
       authorLink: entry.authorLink ?? "",
       svgPath: entry.svgPath,
+      floors,
     });
   }
 
@@ -149,16 +193,26 @@ async function main() {
   // 2) PNG → WebP
   console.log("转换 WebP…");
   for (const job of jobs) {
-    execFileSync("cwebp", [
-      "-quiet",
-      "-q",
-      WEBP_QUALITY,
-      "-metadata",
-      "none",
-      job.pngPath,
-      "-o",
-      join(PUBLIC_MAPS_DIR, `${job.key}.webp`),
-    ]);
+    const outputs =
+      job.floors === undefined
+        ? [{ pngPath: job.pngPath, webp: `${job.key}.webp` }]
+        : job.floors.map((floor) => ({
+            pngPath: floor.pngPath,
+            webp: floor.key === "base" ? `${job.key}.webp` : `${job.key}__${floor.key}.webp`,
+          }));
+
+    for (const output of outputs) {
+      execFileSync("cwebp", [
+        "-quiet",
+        "-q",
+        WEBP_QUALITY,
+        "-metadata",
+        "none",
+        output.pngPath,
+        "-o",
+        join(PUBLIC_MAPS_DIR, output.webp),
+      ]);
+    }
   }
 
   // 3) 生成 TypeScript 元数据
@@ -173,6 +227,7 @@ async function main() {
   lines.push("  height: number;");
   lines.push("  rotation: number;");
   lines.push("  bounds: { minX: number; maxX: number; minZ: number; maxZ: number };");
+  lines.push("  floors: readonly { id: string; name: string; file: string }[];");
   lines.push("  attribution: { author: string; authorLink: string; svgPath: string };");
   lines.push("};");
   lines.push("");
@@ -188,6 +243,9 @@ async function main() {
       `    bounds: { minX: ${map.bounds.minX}, maxX: ${map.bounds.maxX}, minZ: ${map.bounds.minZ}, maxZ: ${map.bounds.maxZ} },`,
     );
     lines.push(
+      `    floors: [${map.floors.map((floor) => `{ id: ${JSON.stringify(floor.id)}, name: ${JSON.stringify(floor.name)}, file: ${JSON.stringify(floor.file)} }`).join(", ")}],`,
+    );
+    lines.push(
       `    attribution: { author: ${JSON.stringify(map.author)}, authorLink: ${JSON.stringify(map.authorLink)}, svgPath: ${JSON.stringify(map.svgPath)} },`,
     );
     lines.push("  },");
@@ -201,8 +259,13 @@ async function main() {
   const totalBytes = (
     await Promise.all(
       metadata.map(async (map) => {
-        const file = await readFile(join(PUBLIC_MAPS_DIR, `${map.key}.webp`));
-        return file.byteLength;
+        const sizes = await Promise.all(
+          map.floors.map(async (floor) => {
+            const file = await readFile(join(PUBLIC_MAPS_DIR, floor.file));
+            return file.byteLength;
+          }),
+        );
+        return sizes.reduce((sum, size) => sum + size, 0);
       }),
     )
   ).reduce((sum, size) => sum + size, 0);

@@ -31,7 +31,7 @@ import {
   presetCalibration,
   shiftCalibration,
 } from "./calibration";
-import { DEFAULT_MAP_ID, assetUrl, findMap, findMapOrNull } from "./maps";
+import { DEFAULT_MAP_ID, assetUrl, findFloor, findMap, findMapOrNull } from "./maps";
 
 export type InteractionMode = "view" | "marker" | "self" | "calibrate" | "shift";
 
@@ -86,6 +86,8 @@ export const MARKER_KIND_COLORS: Record<MarkerKind, string> = {
 
 type MapStore = {
   mapId: string;
+  /** 当前查看的楼层 id（多楼层地图） */
+  floorId: string;
   mode: InteractionMode;
   markerKind: MarkerKind;
   viewport: Viewport;
@@ -138,6 +140,7 @@ type MapStore = {
   setCanvasSize: (size: { width: number; height: number }) => void;
   selectMap: (mapId: string) => void;
   setMode: (mode: InteractionMode) => void;
+  setFloor: (floorId: string) => void;
   setMarkerKind: (kind: MarkerKind) => void;
   setViewport: (viewport: Viewport) => void;
   panBy: (deltaX: number, deltaY: number) => void;
@@ -178,6 +181,7 @@ function emptyCanvasSize(): { width: number; height: number } {
 
 export const useMapStore = create<MapStore>((set, get) => ({
   mapId: DEFAULT_MAP_ID,
+  floorId: findMapOrNull(DEFAULT_MAP_ID)?.floors[0]?.id ?? "ground",
   mode: "marker",
   markerKind: "danger",
   viewport: { scale: 1, offsetX: 0, offsetY: 0 },
@@ -356,9 +360,12 @@ export const useMapStore = create<MapStore>((set, get) => ({
 
   setCanvasSize: (size) => set({ canvasSize: size }),
   selectMap: (mapId) => {
-    if (findMapOrNull(mapId) === null || get().mapId === mapId) return;
+    const nextMap = findMapOrNull(mapId);
+    if (nextMap === null || get().mapId === mapId) return;
     set({
       mapId,
+      // 换图后回到地面层
+      floorId: nextMap.floors[0]?.id ?? "default",
       markers: [],
       selectedMarkerId: null,
       calibration: null,
@@ -375,6 +382,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
     void get().loadCalibration();
   },
   setMode: (mode) => set({ mode, notice: null }),
+  setFloor: (floorId) => set({ floorId, mode: "view", selectedMarkerId: null }),
   setMarkerKind: (markerKind) => set({ markerKind, mode: "marker" }),
   setViewport: (viewport) => set({ viewport }),
   panBy: (deltaX, deltaY) => {
@@ -411,6 +419,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       id: `mk_${createUlid(now)}`,
       roomId: get().room?.id ?? "LOCAL1",
       mapId: get().mapId,
+      floorId: get().floorId,
       kind,
       position,
       label: `${MARKER_KIND_LABELS[kind]} ${sameKind}`,
@@ -429,6 +438,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
         marker: {
           id: marker.id,
           mapId: marker.mapId,
+          floorId: marker.floorId,
           kind: marker.kind,
           position: marker.position,
           label: marker.label,

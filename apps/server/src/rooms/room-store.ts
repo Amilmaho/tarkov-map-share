@@ -300,6 +300,7 @@ export class RoomStore {
       id: draft.id,
       roomId,
       mapId: draft.mapId,
+      floorId: draft.floorId ?? null,
       kind: draft.kind,
       position: draft.position,
       label: draft.label,

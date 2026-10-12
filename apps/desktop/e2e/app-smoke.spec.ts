@@ -30,6 +30,13 @@ test("启动后渲染出地图画布并画出地图内容", async () => {
     await expect(window.getByLabel("选择地图")).toBeVisible();
     await expect(window.getByLabel("选择地图").locator("option")).toHaveCount(10);
 
+    // 海关是多楼层地图，工具栏应当出现楼层切换
+    const floorGroup = window.getByRole("group", { name: "楼层" });
+    await expect(floorGroup).toBeVisible();
+    await expect(floorGroup.getByRole("button", { name: "2 层" })).toBeVisible();
+    await floorGroup.getByRole("button", { name: "2 层" }).click();
+    await expect(floorGroup.getByRole("button", { name: "2 层" })).toHaveAttribute("aria-pressed", "true");
+
     const canvas = window.locator("canvas");
     await expect(canvas).toBeVisible();
 
