@@ -136,6 +136,26 @@ node tools/build-maps.mjs     # 下载 tarkov.dev 的 SVG → Chromium 渲染 �
 脚本写入 `src/renderer/public/maps/*.webp` 与 `src/renderer/src/maps.generated.ts`，
 下载缓存放在 `tools/.cache/`（已 gitignore）。
 
+## 发版流程
+
+```bash
+# 1. 改 apps/desktop/package.json 的 version，并在 docs/CHANGELOG.md 记一笔
+# 2. 构建（国内网络需要镜像）
+ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
+ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ \
+npm run build:win --workspace @tarkov-map-share/desktop
+
+# 3. 提交、打标签、推送
+git commit -am "release: 0.0.x" && git tag -a v0.0.x -m "0.0.x：..." && git push && git push origin v0.0.x
+
+# 4. 建 Release 并上传安装包（需要 gh 已登录）
+gh release create v0.0.x --title "0.0.x — ..." --notes "..." \
+  apps/desktop/release/tarkov-map-share-0.0.x.exe \
+  apps/desktop/release/tarkov-map-share-0.0.x-win.zip
+```
+
+朋友只需要从 Release 页面下载 `tarkov-map-share-<版本>.exe`。
+
 ## 关键约束
 
 1. 渲染进程不直接持有 Node 能力，所有文件访问都经过 preload 白名单。
